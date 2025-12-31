@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
 import { X } from 'lucide-vue-next'
+import { useMusicStore } from '~/stores/music'
 
 const props = defineProps({
     isOpen: Boolean,
@@ -10,6 +11,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'seek'])
 
+const musicStore = useMusicStore()
+
 const lyricsContainerDesktop = ref(null)
 const lyricsContainerMobile = ref(null)
 const isAutoScrollEnabled = ref(true)
@@ -18,59 +21,35 @@ const isScrollingProgrammatically = ref(false)
 const scrollDebounceTimer = ref(null)
 const lastProgrammaticScrollTime = ref(0)
 
-const lyricsData = [
-    { time: 44.76, text: "I know a place" },
-    { time: 54.54, text: "It's somewhere I go when I need to remember your face" },
-    { time: 61.27, text: "" },
-    { time: 64.01, text: "We get married in our heads" },
-    { time: 70.76, text: "" },
-    { time: 74.78, text: "Something to do while we try to recall how we met" },
-    { time: 81.51, text: "" },
-    { time: 84.11, text: "Do you think I have forgotten?" },
-    { time: 89.12, text: "Do you think I have forgotten?" },
-    { time: 94.14, text: "Do you think I have forgotten" },
-    { time: 99.34, text: "About you?" },
-    { time: 104.11, text: "You and I (don't let go)" },
-    { time: 109.15, text: "We're alive (don't let go)" },
-    { time: 114.58, text: "With nothing to do, I could lay and just look in your eyes" },
-    { time: 124.73, text: "Wait (don't let go)" },
-    { time: 129.16, text: "And pretend (don't let go)" },
-    { time: 134.75, text: "Hold on and hope that we'll find our way back in the end" },
-    { time: 141.54, text: "" },
-    { time: 144.29, text: "Do you think I have forgotten?" },
-    { time: 149.22, text: "Do you think I have forgotten?" },
-    { time: 154.26, text: "Do you think I have forgotten" },
-    { time: 159.18, text: "About you?" },
-    { time: 162.11, text: "" },
-    { time: 164.15, text: "Do you think I have forgotten?" },
-    { time: 169.16, text: "Do you think I have forgotten?" },
-    { time: 174.10, text: "Do you think I have forgotten" },
-    { time: 179.17, text: "About you?" },
-    { time: 184.53, text: "And there was something 'bout you that now I can't remember" },
-    { time: 189.60, text: "It's the same damn thing that made my heart surrender" },
-    { time: 194.47, text: "And I miss you on a train, I miss you in the morning" },
-    { time: 199.55, text: "I never know what to think about" },
-    { time: 203.52, text: "I think about you (so don't let go)" },
-    { time: 209.10, text: "About you (so don't let go)" },
-    { time: 214.25, text: "Do you think I have forgotten" },
-    { time: 219.21, text: "About you? (Don't let go)" },
-    { time: 224.27, text: "About you" },
-    { time: 229.11, text: "About you" },
-    { time: 231.88, text: "" },
-    { time: 234.16, text: "Do you think I have forgotten" },
-    { time: 239.28, text: "About you? (Don't let go)" }
-]
+const loadingLyrics = computed(() => musicStore.loadingDetail)
+
+const lyricsData = computed(() => {
+    if (!props.currentSong?.id) return []
+
+    const songDetail = musicStore.getSongDetail(props.currentSong.id)
+    if (!songDetail || !songDetail.lyrics) return []
+
+    // Convert string time to number
+    return songDetail.lyrics.map(lyric => ({
+        time: parseFloat(lyric.time),
+        text: lyric.text
+    }))
+})
+
+const hasLyrics = computed(() => {
+    return lyricsData.value && lyricsData.value.length > 0
+})
 
 const currentLineIndex = computed(() => {
-    if (!props.currentSong || props.currentSong.title !== "About You") return -1
+    if (!props.currentSong || !hasLyrics.value) return -1
 
-    // PERBAIKAN: Kalau belum sampai lyric pertama, return -1 (belum ada yang aktif)
-    if (props.currentTime < lyricsData[0].time) {
+    // Kalau belum sampai lyric pertama, return -1 (belum ada yang aktif)
+    if (props.currentTime < lyricsData.value[0].time) {
         return -1
     }
 
-    for (let i = lyricsData.length - 1; i >= 0; i--) {
-        if (props.currentTime >= lyricsData[i].time) {
+    for (let i = lyricsData.value.length - 1; i >= 0; i--) {
+        if (props.currentTime >= lyricsData.value[i].time) {
             return i
         }
     }
@@ -122,7 +101,7 @@ const syncLyrics = async () => {
 const scrollToActiveLine = async (immediate = false) => {
     if (!isAutoScrollEnabled.value) return
 
-    // PERBAIKAN: Jangan scroll kalau belum waktunya lyric (index -1)
+    // Jangan scroll kalau belum waktunya lyric (index -1)
     if (currentLineIndex.value === -1) return
 
     await nextTick()
@@ -162,7 +141,7 @@ watch(currentLineIndex, () => {
 })
 
 const getLineState = (index) => {
-    // PERBAIKAN: Kalau belum ada yang aktif (-1), semua jadi future
+    // Kalau belum ada yang aktif (-1), semua jadi future
     if (currentLineIndex.value === -1) return 'future'
 
     if (index === currentLineIndex.value) return 'active'
@@ -194,7 +173,7 @@ const handleLyricClick = async (lyricTime) => {
 }
 
 const showLyrics = computed(() => {
-    return props.isOpen && props.currentSong && props.currentSong.title === "About You"
+    return props.isOpen && props.currentSong
 })
 </script>
 
@@ -216,7 +195,23 @@ const showLyrics = computed(() => {
             </div>
 
             <div class="relative flex-1 overflow-hidden">
-                <div ref="lyricsContainerDesktop" @scroll="handleUserScroll"
+                <!-- Loading State -->
+                <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
+                    <span class="loading loading-spinner loading-lg"></span>
+                </div>
+
+                <!-- No Lyrics State -->
+                <div v-else-if="!hasLyrics" class="h-full flex flex-col items-center justify-center px-4 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-30 mb-3" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p class="text-sm opacity-60">Lyrics not available for this song</p>
+                </div>
+
+                <!-- Lyrics Content -->
+                <div v-else ref="lyricsContainerDesktop" @scroll="handleUserScroll"
                     class="h-full overflow-y-auto px-4 py-3 lyrics-container">
                     <div class="py-0">
                         <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
@@ -229,7 +224,7 @@ const showLyrics = computed(() => {
 
                 <!-- Sync Button Desktop -->
                 <Transition name="fade-slide">
-                    <div v-if="showSyncButton"
+                    <div v-if="showSyncButton && hasLyrics"
                         class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
                         <button @click="syncLyrics" class="btn btn-primary btn-sm shadow-lg pointer-events-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
@@ -270,7 +265,23 @@ const showLyrics = computed(() => {
             </div>
 
             <div class="relative flex-1 overflow-hidden">
-                <div ref="lyricsContainerMobile" @scroll="handleUserScroll"
+                <!-- Loading State -->
+                <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
+                    <span class="loading loading-spinner loading-lg"></span>
+                </div>
+
+                <!-- No Lyrics State -->
+                <div v-else-if="!hasLyrics" class="h-full flex flex-col items-center justify-center px-4 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-30 mb-3" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p class="text-sm opacity-60">Lyrics not available for this song</p>
+                </div>
+
+                <!-- Lyrics Content -->
+                <div v-else ref="lyricsContainerMobile" @scroll="handleUserScroll"
                     class="h-full overflow-y-auto px-4 py-3 lyrics-container">
                     <div class="py-0">
                         <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
@@ -283,7 +294,7 @@ const showLyrics = computed(() => {
 
                 <!-- Sync Button Mobile -->
                 <Transition name="fade-slide">
-                    <div v-if="showSyncButton"
+                    <div v-if="showSyncButton && hasLyrics"
                         class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
                         <button @click="syncLyrics" class="btn btn-primary btn-sm shadow-lg pointer-events-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
