@@ -13,14 +13,15 @@ const emit = defineEmits(['toggle-play', 'next', 'previous', 'seek', 'open-lyric
 
 const progressBar = ref(null)
 const progress = ref(0)
+const isDragging = ref(false)
 
 watch(() => props.currentTime, (time) => {
-    if (props.duration > 0) {
+    if (props.duration > 0 && !isDragging.value) {
         progress.value = (time / props.duration) * 100
     }
 })
 
-const handleProgressClick = (e) => {
+const handleProgressInteraction = (e) => {
     if (!progressBar.value || !props.duration) return
 
     const rect = progressBar.value.getBoundingClientRect()
@@ -28,14 +29,42 @@ const handleProgressClick = (e) => {
     const percentage = (clickX / rect.width) * 100
 
     const newProgress = Math.max(0, Math.min(100, percentage))
+    progress.value = newProgress
     const newTime = Math.floor((newProgress / 100) * props.duration)
 
     emit('seek', newTime)
 }
 
+const handleProgressClick = (e) => {
+    handleProgressInteraction(e)
+}
+
+const handleMouseDown = (e) => {
+    isDragging.value = true
+    handleProgressInteraction(e)
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+}
+
+const handleMouseMove = (e) => {
+    if (isDragging.value) {
+        handleProgressInteraction(e)
+    }
+}
+
+const handleMouseUp = () => {
+    isDragging.value = false
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+}
+
+// PERBAIKAN DI SINI
 const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
+    // Bulatkan dulu untuk menghindari floating point issues
+    const roundedSeconds = Math.floor(seconds)
+    const mins = Math.floor(roundedSeconds / 60)
+    const secs = roundedSeconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 </script>
@@ -122,7 +151,8 @@ const formatTime = (seconds) => {
 
                         <!-- Progress Bar - DRAGGABLE -->
                         <div class="w-full">
-                            <div class="relative cursor-pointer" @click="handleProgressClick" ref="progressBar">
+                            <div class="relative cursor-pointer select-none" @click="handleProgressClick"
+                                @mousedown="handleMouseDown" ref="progressBar">
                                 <progress class="progress pointer-events-none" :value="progress" max="100"></progress>
                             </div>
                             <div class="flex justify-between text-xs opacity-50 mt-1">

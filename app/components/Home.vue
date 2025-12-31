@@ -49,6 +49,13 @@ watch(currentTime, (time) => {
     }
 })
 
+// TAMBAHKAN INI: Watch perubahan dari layout (ketika lyric diklik)
+watch(() => lyricsState?.currentTime.value, (newTime) => {
+    if (newTime !== undefined && newTime !== currentTime.value) {
+        currentTime.value = newTime
+    }
+})
+
 // Simulasi audio playback
 watch(isPlaying, (playing) => {
     if (playing) {
@@ -56,10 +63,9 @@ watch(isPlaying, (playing) => {
             if (currentTime.value < duration.value) {
                 currentTime.value++
             } else {
-                // Auto next song ketika selesai
                 nextSong()
             }
-        }, 1000) // 1 detik = 1 detik simulasi
+        }, 1000)
     } else {
         if (intervalId) {
             clearInterval(intervalId)
@@ -85,6 +91,16 @@ const togglePlay = () => {
     isPlaying.value = !isPlaying.value
 }
 
+const togglePlayFromCard = (song, index, event) => {
+    event.stopPropagation()
+
+    if (currentSong.value?.title === song.title) {
+        isPlaying.value = !isPlaying.value
+    } else {
+        playSong(song, index)
+    }
+}
+
 const nextSong = () => {
     if (currentIndex.value < songs.value.length - 1) {
         currentIndex.value++
@@ -92,7 +108,6 @@ const nextSong = () => {
         currentTime.value = 0
         isPlaying.value = true
     } else {
-        // Sudah di akhir playlist
         isPlaying.value = false
     }
 }
@@ -133,14 +148,23 @@ const openLyrics = () => {
                                     class="rounded-xl aspect-square object-cover w-full" />
                                 <div
                                     class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
-                                        class="w-16 h-16 drop-shadow-lg">
-                                        <path
-                                            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-                                    </svg>
+                                    <button @click="togglePlayFromCard(song, index, $event)"
+                                        class="hover:scale-110 transition-transform">
+                                        <svg v-if="currentSong?.title !== song.title || !isPlaying"
+                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
+                                            class="w-16 h-16 drop-shadow-lg">
+                                            <path
+                                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                                        </svg>
+                                        <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
+                                            class="w-16 h-16 drop-shadow-lg">
+                                            <path fill-rule="evenodd"
+                                                d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
                                 </div>
 
-                                <!-- Now Playing Indicator -->
                                 <div v-if="currentSong?.title === song.title && isPlaying"
                                     class="absolute top-2 right-2 bg-primary text-primary-content px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                                     <span class="flex gap-0.5">
@@ -153,6 +177,11 @@ const openLyrics = () => {
                                     </span>
                                     Playing
                                 </div>
+
+                                <div v-if="currentSong?.title === song.title && !isPlaying"
+                                    class="absolute top-2 right-2 bg-primary text-primary-content px-2 py-1 rounded-full text-xs font-bold">
+                                    Paused
+                                </div>
                             </div>
                         </figure>
                         <div class="card-body p-4">
@@ -164,7 +193,6 @@ const openLyrics = () => {
             </div>
         </div>
 
-        <!-- Music Player Bar -->
         <MusicPlayerBar :current-song="currentSong" :is-playing="isPlaying" :current-time="currentTime"
             :duration="duration" @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
             @open-lyrics="openLyrics" />

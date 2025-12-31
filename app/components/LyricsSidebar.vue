@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { X } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -8,10 +8,15 @@ const props = defineProps({
     currentTime: Number
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'seek'])
 
 const lyricsContainerDesktop = ref(null)
 const lyricsContainerMobile = ref(null)
+const isAutoScrollEnabled = ref(true)
+const showSyncButton = ref(false)
+const isScrollingProgrammatically = ref(false)
+const scrollDebounceTimer = ref(null)
+const lastProgrammaticScrollTime = ref(0)
 
 const lyricsData = [
     { time: 44.76, text: "I know a place" },
@@ -57,26 +62,81 @@ const lyricsData = [
 ]
 
 const currentLineIndex = computed(() => {
-    if (!props.currentSong || props.currentSong.title !== "About You") return 0
+    if (!props.currentSong || props.currentSong.title !== "About You") return -1
+
+    // PERBAIKAN: Kalau belum sampai lyric pertama, return -1 (belum ada yang aktif)
+    if (props.currentTime < lyricsData[0].time) {
+        return -1
+    }
 
     for (let i = lyricsData.length - 1; i >= 0; i--) {
         if (props.currentTime >= lyricsData[i].time) {
             return i
         }
     }
-    return 0
+    return -1
 })
 
-watch(currentLineIndex, async (newIndex) => {
-    await new Promise(resolve => setTimeout(resolve, 50))
+const handleUserScroll = () => {
+    const now = Date.now()
+    if (now - lastProgrammaticScrollTime.value < 1500) {
+        return
+    }
+
+    if (isScrollingProgrammatically.value) {
+        return
+    }
+
+    if (scrollDebounceTimer.value) {
+        clearTimeout(scrollDebounceTimer.value)
+    }
+
+    scrollDebounceTimer.value = setTimeout(() => {
+        const checkNow = Date.now()
+        if (checkNow - lastProgrammaticScrollTime.value >= 1500 && !isScrollingProgrammatically.value) {
+            isAutoScrollEnabled.value = false
+            showSyncButton.value = true
+        }
+    }, 200)
+}
+
+const syncLyrics = async () => {
+    isAutoScrollEnabled.value = true
+    showSyncButton.value = false
+    isScrollingProgrammatically.value = true
+    lastProgrammaticScrollTime.value = Date.now()
+
+    if (scrollDebounceTimer.value) {
+        clearTimeout(scrollDebounceTimer.value)
+        scrollDebounceTimer.value = null
+    }
+
+    await nextTick()
+    scrollToActiveLine(true)
+
+    setTimeout(() => {
+        isScrollingProgrammatically.value = false
+    }, 1200)
+}
+
+const scrollToActiveLine = async (immediate = false) => {
+    if (!isAutoScrollEnabled.value) return
+
+    // PERBAIKAN: Jangan scroll kalau belum waktunya lyric (index -1)
+    if (currentLineIndex.value === -1) return
+
+    await nextTick()
 
     const container = window.innerWidth >= 1024
         ? lyricsContainerDesktop.value
         : lyricsContainerMobile.value
 
     if (container) {
-        const activeLine = container.querySelector(`[data-index="${newIndex}"]`)
+        const activeLine = container.querySelector(`[data-index="${currentLineIndex.value}"]`)
         if (activeLine) {
+            lastProgrammaticScrollTime.value = Date.now()
+            isScrollingProgrammatically.value = true
+
             const containerRect = container.getBoundingClientRect()
             const lineRect = activeLine.getBoundingClientRect()
             const scrollTop = container.scrollTop
@@ -84,16 +144,53 @@ watch(currentLineIndex, async (newIndex) => {
 
             container.scrollTo({
                 top: offset,
-                behavior: 'smooth'
+                behavior: immediate ? 'auto' : 'smooth'
             })
+
+            const delay = immediate ? 200 : 700
+            setTimeout(() => {
+                isScrollingProgrammatically.value = false
+            }, delay)
         }
+    }
+}
+
+watch(currentLineIndex, () => {
+    if (isAutoScrollEnabled.value) {
+        scrollToActiveLine()
     }
 })
 
 const getLineState = (index) => {
+    // PERBAIKAN: Kalau belum ada yang aktif (-1), semua jadi future
+    if (currentLineIndex.value === -1) return 'future'
+
     if (index === currentLineIndex.value) return 'active'
     if (index < currentLineIndex.value) return 'past'
     return 'future'
+}
+
+const handleLyricClick = async (lyricTime) => {
+    emit('seek', lyricTime)
+
+    isAutoScrollEnabled.value = true
+    showSyncButton.value = false
+    isScrollingProgrammatically.value = true
+    lastProgrammaticScrollTime.value = Date.now()
+
+    if (scrollDebounceTimer.value) {
+        clearTimeout(scrollDebounceTimer.value)
+        scrollDebounceTimer.value = null
+    }
+
+    await nextTick()
+    setTimeout(() => {
+        scrollToActiveLine(true)
+    }, 100)
+
+    setTimeout(() => {
+        isScrollingProgrammatically.value = false
+    }, 1200)
 }
 
 const showLyrics = computed(() => {
@@ -118,13 +215,32 @@ const showLyrics = computed(() => {
                 <p class="text-xs opacity-60">{{ currentSong.name }}</p>
             </div>
 
-            <div ref="lyricsContainerDesktop" class="flex-1 overflow-y-auto px-4 py-3 lyrics-container">
-                <div class="py-0">
-                    <div v-for="(line, index) in lyricsData" :key="index" :data-index="index" class="lyric-line"
-                        :class="getLineState(index)">
-                        {{ line.text || '♪' }}
+            <div class="relative flex-1 overflow-hidden">
+                <div ref="lyricsContainerDesktop" @scroll="handleUserScroll"
+                    class="h-full overflow-y-auto px-4 py-3 lyrics-container">
+                    <div class="py-0">
+                        <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
+                            class="lyric-line cursor-pointer" :class="getLineState(index)"
+                            @click="handleLyricClick(line.time)">
+                            {{ line.text || '♪' }}
+                        </div>
                     </div>
                 </div>
+
+                <!-- Sync Button Desktop -->
+                <Transition name="fade-slide">
+                    <div v-if="showSyncButton"
+                        class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+                        <button @click="syncLyrics" class="btn btn-primary btn-sm shadow-lg pointer-events-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Sync Lyrics
+                        </button>
+                    </div>
+                </Transition>
             </div>
         </div>
     </Transition>
@@ -153,13 +269,32 @@ const showLyrics = computed(() => {
                 <p class="text-xs opacity-60">{{ currentSong.name }}</p>
             </div>
 
-            <div ref="lyricsContainerMobile" class="flex-1 overflow-y-auto px-4 py-3 lyrics-container">
-                <div class="py-0">
-                    <div v-for="(line, index) in lyricsData" :key="index" :data-index="index" class="lyric-line"
-                        :class="getLineState(index)">
-                        {{ line.text || '♪' }}
+            <div class="relative flex-1 overflow-hidden">
+                <div ref="lyricsContainerMobile" @scroll="handleUserScroll"
+                    class="h-full overflow-y-auto px-4 py-3 lyrics-container">
+                    <div class="py-0">
+                        <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
+                            class="lyric-line cursor-pointer" :class="getLineState(index)"
+                            @click="handleLyricClick(line.time)">
+                            {{ line.text || '♪' }}
+                        </div>
                     </div>
                 </div>
+
+                <!-- Sync Button Mobile -->
+                <Transition name="fade-slide">
+                    <div v-if="showSyncButton"
+                        class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+                        <button @click="syncLyrics" class="btn btn-primary btn-sm shadow-lg pointer-events-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Sync Lyrics
+                        </button>
+                    </div>
+                </Transition>
             </div>
         </div>
     </Transition>
@@ -204,6 +339,11 @@ const showLyrics = computed(() => {
     line-height: 1.4;
 }
 
+.lyric-line:hover {
+    opacity: 1 !important;
+    transform: scale(1.02);
+}
+
 .lyric-line.future {
     font-size: 0.875rem;
     opacity: 0.3;
@@ -239,6 +379,17 @@ const showLyrics = computed(() => {
 .fade-enter-from,
 .fade-leave-to {
     opacity: 0;
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+    transition: all 0.3s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+    opacity: 0;
+    transform: translateY(10px);
 }
 
 .slide-left-enter-active,

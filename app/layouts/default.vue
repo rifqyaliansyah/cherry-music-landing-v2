@@ -16,8 +16,13 @@ provide('lyricsState', {
     openLyrics: () => { lyricsOpen.value = true },
     closeLyrics: () => { lyricsOpen.value = false },
     setCurrentSong: (song) => { currentSong.value = song },
-    setCurrentTime: (time) => { currentTime.value = time }
+    setCurrentTime: (time) => { currentTime.value = time },
+    seekTo: (time) => { currentTime.value = time } // Tambahkan ini
 })
+
+const handleLyricsSeek = (time) => {
+    currentTime.value = time
+}
 </script>
 
 <template>
@@ -37,6 +42,6 @@ provide('lyricsState', {
         </div>
 
         <LyricsSidebar :is-open="lyricsOpen" :current-song="currentSong" :current-time="currentTime"
-            @close="lyricsOpen = false" />
+            @close="lyricsOpen = false" @seek="handleLyricsSeek" />
     </div>
 </template>
