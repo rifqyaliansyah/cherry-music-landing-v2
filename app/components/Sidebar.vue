@@ -1,5 +1,5 @@
 <script setup>
-import { Heart, Search, ListMusic } from 'lucide-vue-next'
+import { ListMusic } from 'lucide-vue-next'
 
 const closeDrawer = () => {
     if (window.innerWidth < 1024) {
@@ -22,20 +22,14 @@ const closeDrawer = () => {
                 <li>
                     <NuxtLink to="/" @click="closeDrawer"
                         class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
-                        data-tip="Homepage">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-linejoin="round"
-                            stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor"
-                            class="my-1.5 inline-block size-4">
-                            <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
-                            <path
-                                d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                        </svg>
-                        <span class="is-drawer-close:hidden">Homepage</span>
+                        data-tip="All Songs">
+                        <ListMusic class="my-1.5 inline-block size-4" />
+                        <span class="is-drawer-close:hidden">All Songs</span>
                     </NuxtLink>
                 </li>
 
-                <li>
-                    <NuxtLink to="/like" @click="closeDrawer"
+                <!-- <li>
+                    <NuxtLink to="/playlist" @click="closeDrawer"
                         class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
                         data-tip="Playlist">
                         <ListMusic class="my-1.5 inline-block size-4" />
@@ -59,7 +53,7 @@ const closeDrawer = () => {
                         <Search class="my-1.5 inline-block size-4" />
                         <span class="is-drawer-close:hidden">Search</span>
                     </NuxtLink>
-                </li>
+                </li> -->
             </ul>
         </div>
     </div>
