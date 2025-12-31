@@ -1,5 +1,5 @@
 <script setup>
-import { ref, inject, watch, computed } from 'vue'
+import { ref, inject, watch, computed, onUnmounted } from 'vue'
 
 const songs = ref([
     { title: "About You", name: "The 1975", cover: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSLHxGbeuivjpsMdf5JN_gdw-8zQ4YT8ZCBUQ&s", duration: 245 },
@@ -17,6 +17,10 @@ const songs = ref([
 const currentSong = ref(null)
 const currentIndex = ref(-1)
 const isPlaying = ref(false)
+const currentTime = ref(0)
+const duration = ref(0)
+
+let intervalId = null
 
 const lyricsState = inject('lyricsState')
 
@@ -32,11 +36,48 @@ watch(currentSong, (newSong) => {
     if (lyricsState) {
         lyricsState.setCurrentSong(newSong)
     }
+    if (newSong) {
+        duration.value = newSong.duration
+        currentTime.value = 0
+    }
+})
+
+// Sync currentTime dengan layout
+watch(currentTime, (time) => {
+    if (lyricsState) {
+        lyricsState.setCurrentTime(time)
+    }
+})
+
+// Simulasi audio playback
+watch(isPlaying, (playing) => {
+    if (playing) {
+        intervalId = setInterval(() => {
+            if (currentTime.value < duration.value) {
+                currentTime.value++
+            } else {
+                // Auto next song ketika selesai
+                nextSong()
+            }
+        }, 1000) // 1 detik = 1 detik simulasi
+    } else {
+        if (intervalId) {
+            clearInterval(intervalId)
+            intervalId = null
+        }
+    }
+})
+
+onUnmounted(() => {
+    if (intervalId) {
+        clearInterval(intervalId)
+    }
 })
 
 const playSong = (song, index) => {
     currentSong.value = song
     currentIndex.value = index
+    currentTime.value = 0
     isPlaying.value = true
 }
 
@@ -48,7 +89,11 @@ const nextSong = () => {
     if (currentIndex.value < songs.value.length - 1) {
         currentIndex.value++
         currentSong.value = songs.value[currentIndex.value]
+        currentTime.value = 0
         isPlaying.value = true
+    } else {
+        // Sudah di akhir playlist
+        isPlaying.value = false
     }
 }
 
@@ -56,8 +101,13 @@ const previousSong = () => {
     if (currentIndex.value > 0) {
         currentIndex.value--
         currentSong.value = songs.value[currentIndex.value]
+        currentTime.value = 0
         isPlaying.value = true
     }
+}
+
+const seekTo = (time) => {
+    currentTime.value = time
 }
 
 const openLyrics = () => {
@@ -71,28 +121,43 @@ const openLyrics = () => {
     <div class="pb-32">
         <div class="container mx-auto max-w-6xl px-4">
             <div class="py-6 md:py-8">
-                <h1 class="text-xs font-bold">Created by you</h1>
+                <h1 class="text-xs font-bold opacity-60">Created by you</h1>
                 <h1 class="text-3xl font-bold mb-6">All Songs</h1>
 
                 <div class="grid gap-4 transition-all duration-300" :class="gridClass">
                     <div v-for="(song, index) in songs" :key="index" @click="playSong(song, index)"
-                        class="card bg-base-100 shadow-md hover:shadow-xl transition-shadow cursor-pointer">
-                        <figure class="px-4 pt-4 relative group">
-                            <div class="relative">
-                                <img :src="song.cover" alt="Song Cover" class="rounded-xl aspect-square object-cover" />
+                        class="card bg-base-100 shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer group">
+                        <figure class="px-4 pt-4 relative">
+                            <div class="relative w-full">
+                                <img :src="song.cover" alt="Song Cover"
+                                    class="rounded-xl aspect-square object-cover w-full" />
                                 <div
                                     class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
-                                        class="w-16 h-16">
+                                        class="w-16 h-16 drop-shadow-lg">
                                         <path
                                             d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
                                     </svg>
                                 </div>
+
+                                <!-- Now Playing Indicator -->
+                                <div v-if="currentSong?.title === song.title && isPlaying"
+                                    class="absolute top-2 right-2 bg-primary text-primary-content px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                    <span class="flex gap-0.5">
+                                        <span class="w-0.5 h-3 bg-current animate-pulse"
+                                            style="animation-delay: 0s"></span>
+                                        <span class="w-0.5 h-3 bg-current animate-pulse"
+                                            style="animation-delay: 0.15s"></span>
+                                        <span class="w-0.5 h-3 bg-current animate-pulse"
+                                            style="animation-delay: 0.3s"></span>
+                                    </span>
+                                    Playing
+                                </div>
                             </div>
                         </figure>
                         <div class="card-body p-4">
-                            <h2 class="card-title text-base">{{ song.title }}</h2>
-                            <p class="text-xs opacity-60">{{ song.name }}</p>
+                            <h2 class="card-title text-base truncate">{{ song.title }}</h2>
+                            <p class="text-xs opacity-60 truncate">{{ song.name }}</p>
                         </div>
                     </div>
                 </div>
@@ -100,7 +165,26 @@ const openLyrics = () => {
         </div>
 
         <!-- Music Player Bar -->
-        <MusicPlayerBar :current-song="currentSong" :is-playing="isPlaying" @toggle-play="togglePlay" @next="nextSong"
-            @previous="previousSong" @open-lyrics="openLyrics" />
+        <MusicPlayerBar :current-song="currentSong" :is-playing="isPlaying" :current-time="currentTime"
+            :duration="duration" @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
+            @open-lyrics="openLyrics" />
     </div>
 </template>
+
+<style scoped>
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scaleY(0.5);
+    }
+
+    50% {
+        transform: scaleY(1);
+    }
+}
+
+.animate-pulse {
+    animation: pulse 1s ease-in-out infinite;
+}
+</style>

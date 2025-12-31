@@ -3,6 +3,7 @@ import { provide, ref, computed } from 'vue'
 
 const lyricsOpen = ref(false)
 const currentSong = ref(null)
+const currentTime = ref(0)
 
 const contentMarginClass = computed(() => {
     return currentSong.value ? 'mb-[125px]' : ''
@@ -11,9 +12,11 @@ const contentMarginClass = computed(() => {
 provide('lyricsState', {
     lyricsOpen,
     currentSong,
+    currentTime,
     openLyrics: () => { lyricsOpen.value = true },
     closeLyrics: () => { lyricsOpen.value = false },
-    setCurrentSong: (song) => { currentSong.value = song }
+    setCurrentSong: (song) => { currentSong.value = song },
+    setCurrentTime: (time) => { currentTime.value = time }
 })
 </script>
 
@@ -33,6 +36,7 @@ provide('lyricsState', {
             <Sidebar />
         </div>
 
-        <LyricsSidebar :is-open="lyricsOpen" :current-song="currentSong" @close="lyricsOpen = false" />
+        <LyricsSidebar :is-open="lyricsOpen" :current-song="currentSong" :current-time="currentTime"
+            @close="lyricsOpen = false" />
     </div>
 </template>

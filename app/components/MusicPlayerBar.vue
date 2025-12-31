@@ -3,72 +3,34 @@ import { ref, watch } from 'vue'
 import { ListMusic } from 'lucide-vue-next'
 
 const props = defineProps({
-    currentSong: {
-        type: Object,
-        default: null
-    },
-    isPlaying: {
-        type: Boolean,
-        default: false
-    }
+    currentSong: Object,
+    isPlaying: Boolean,
+    currentTime: Number,
+    duration: Number
 })
 
-const emit = defineEmits(['toggle-play', 'next', 'previous', 'open-lyrics'])
+const emit = defineEmits(['toggle-play', 'next', 'previous', 'seek', 'open-lyrics'])
 
-const currentTime = ref(0)
-const duration = ref(0)
-const progress = ref(0)
 const progressBar = ref(null)
+const progress = ref(0)
 
-let interval = null
-
-watch(() => props.currentSong, (newSong) => {
-    if (newSong) {
-        duration.value = newSong.duration || 0
-        currentTime.value = 0
-        progress.value = 0
-        if (props.isPlaying) {
-            startProgress()
-        }
-    }
-}, { immediate: true })
-
-watch(() => props.isPlaying, (playing) => {
-    if (playing) {
-        startProgress()
-    } else {
-        stopProgress()
+watch(() => props.currentTime, (time) => {
+    if (props.duration > 0) {
+        progress.value = (time / props.duration) * 100
     }
 })
-
-const startProgress = () => {
-    stopProgress()
-    interval = setInterval(() => {
-        if (currentTime.value < duration.value) {
-            currentTime.value += 1
-            progress.value = (currentTime.value / duration.value) * 100
-        } else {
-            emit('next')
-        }
-    }, 1000)
-}
-
-const stopProgress = () => {
-    if (interval) {
-        clearInterval(interval)
-        interval = null
-    }
-}
 
 const handleProgressClick = (e) => {
-    if (!progressBar.value || !duration.value) return
+    if (!progressBar.value || !props.duration) return
 
     const rect = progressBar.value.getBoundingClientRect()
     const clickX = e.clientX - rect.left
     const percentage = (clickX / rect.width) * 100
 
-    progress.value = Math.max(0, Math.min(100, percentage))
-    currentTime.value = Math.floor((progress.value / 100) * duration.value)
+    const newProgress = Math.max(0, Math.min(100, percentage))
+    const newTime = Math.floor((newProgress / 100) * props.duration)
+
+    emit('seek', newTime)
 }
 
 const formatTime = (seconds) => {
