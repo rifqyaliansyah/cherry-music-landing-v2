@@ -50,9 +50,8 @@ const handleProgressInteraction = (clientX) => {
 }
 
 const handleProgressClick = (e) => {
-    emit('seek-start') // PERBAIKAN: Emit seek start
+    emit('seek-start')
     handleProgressInteraction(e.clientX)
-    // Delay sedikit sebelum emit seek end
     setTimeout(() => {
         emit('seek-end')
     }, 50)
@@ -60,7 +59,7 @@ const handleProgressClick = (e) => {
 
 const handleMouseDown = (e) => {
     isDragging.value = true
-    emit('seek-start') // PERBAIKAN: Emit seek start saat mulai drag
+    emit('seek-start')
     handleProgressInteraction(e.clientX)
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -75,15 +74,14 @@ const handleMouseMove = (e) => {
 
 const handleMouseUp = () => {
     isDragging.value = false
-    emit('seek-end') // PERBAIKAN: Emit seek end saat selesai drag
+    emit('seek-end')
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
 }
 
-// Touch events for mobile
 const handleTouchStart = (e) => {
     isDragging.value = true
-    emit('seek-start') // PERBAIKAN: Emit seek start saat mulai drag
+    emit('seek-start')
     const touch = e.touches[0]
     handleProgressInteraction(touch.clientX)
 
@@ -93,7 +91,7 @@ const handleTouchStart = (e) => {
 
 const handleTouchMove = (e) => {
     if (isDragging.value) {
-        e.preventDefault() // Prevent scrolling while dragging
+        e.preventDefault()
         const touch = e.touches[0]
         handleProgressInteraction(touch.clientX)
     }
@@ -101,7 +99,7 @@ const handleTouchMove = (e) => {
 
 const handleTouchEnd = () => {
     isDragging.value = false
-    emit('seek-end') // PERBAIKAN: Emit seek end saat selesai drag
+    emit('seek-end')
     document.removeEventListener('touchmove', handleTouchMove)
     document.removeEventListener('touchend', handleTouchEnd)
 }
@@ -115,7 +113,6 @@ const toggleMute = () => {
 }
 
 const formatTime = (seconds) => {
-    // Batasi seconds agar tidak melebihi duration
     const clampedSeconds = Math.min(seconds, props.duration || seconds)
     const roundedSeconds = Math.floor(clampedSeconds)
     const mins = Math.floor(roundedSeconds / 60)
@@ -130,7 +127,6 @@ const formatTime = (seconds) => {
             class="fixed bottom-0 left-0 right-0 bg-base-200 border-t border-base-300 z-40 shadow-2xl">
             <div class="container mx-auto max-w-6xl px-4 py-3">
                 <div class="flex items-center gap-4">
-                    <!-- Song Info - Left -->
                     <div class="flex items-center gap-3 w-[30%] min-w-[120px] lg:min-w-[180px]">
                         <img :src="currentSong.cover"
                             class="w-16 h-16 md:w-14 md:h-14 rounded object-cover shadow-lg" />
@@ -140,10 +136,8 @@ const formatTime = (seconds) => {
                         </div>
                     </div>
 
-                    <!-- Play Controls - Center -->
                     <div class="flex-1 flex flex-col items-center gap-2 max-w-[500px] -ml-12 md:-ml-4 lg:ml-0">
                         <div class="flex items-center gap-2">
-                            <!-- Shuffle Button -->
                             <button @click="$emit('toggle-shuffle')" class="btn btn-square btn-neutral btn-xs" :class="{
                                 'btn-primary': shuffleEnabled,
                                 'btn-disabled opacity-30 cursor-not-allowed': repeatMode !== 'off'
@@ -191,7 +185,6 @@ const formatTime = (seconds) => {
                                 </svg>
                             </button>
 
-                            <!-- Repeat Button -->
                             <button @click="$emit('toggle-repeat')" class="btn btn-square btn-neutral btn-xs relative"
                                 :class="{
                                     'btn-primary': repeatMode !== 'off',
@@ -208,7 +201,6 @@ const formatTime = (seconds) => {
                                     <path d="M38 7L44 13L38 19" stroke="currentColor" stroke-width="4"
                                         stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
-                                <!-- Indicator for Repeat One -->
                                 <span v-if="repeatMode === 'one'"
                                     class="absolute -top-1 -right-1 bg-primary text-primary-content rounded-full w-3 h-3 flex items-center justify-center text-[8px] font-bold">
                                     1
@@ -216,7 +208,6 @@ const formatTime = (seconds) => {
                             </button>
                         </div>
 
-                        <!-- Progress Bar - DRAGGABLE -->
                         <div class="w-full flex items-center gap-2">
                             <span class="text-xs opacity-50 text-right pt-1">{{ formatTime(currentTime) }}</span>
                             <div class="relative cursor-pointer select-none flex-1 touch-none"
@@ -228,15 +219,12 @@ const formatTime = (seconds) => {
                         </div>
                     </div>
 
-                    <!-- Extra Controls - Right -->
                     <div class="flex flex-col lg:flex-row items-center gap-2 lg:gap-2 w-[30%] justify-end">
-                        <!-- Lyrics Button - Show on all screens -->
                         <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-xs lg:btn-sm">
                             <ListMusic :size="14" class="lg:hidden" />
                             <ListMusic :size="16" class="hidden lg:block" />
                         </button>
 
-                        <!-- Mute/Unmute Toggle - Show on all screens -->
                         <button @click="toggleMute" class="btn btn-square btn-neutral btn-xs lg:btn-sm">
                             <Volume2 v-if="volume > 0" :size="14" class="lg:hidden" />
                             <Volume2 v-if="volume > 0" :size="16" class="hidden lg:block" />

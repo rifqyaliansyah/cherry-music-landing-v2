@@ -21,7 +21,6 @@ const repeatMode = ref('off') // 'off', 'all', 'one'
 const volume = ref(1) // 0 - 1
 const shuffledIndices = ref([])
 
-// Flag untuk mencegah auto-next saat user sedang drag progress bar
 const isUserSeeking = ref(false)
 
 const audioRef = ref(null)
@@ -47,11 +46,9 @@ const shufflePlaylist = () => {
     if (songs.value.length === 0) return
 
     if (shuffleEnabled.value) {
-        // Create shuffled array of indices
         shuffledIndices.value = [...Array(songs.value.length).keys()]
             .sort(() => Math.random() - 0.5)
 
-        // Make sure current song stays as first in shuffle
         if (currentIndex.value !== -1) {
             const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
             if (currentPos > 0) {
@@ -66,7 +63,6 @@ const shufflePlaylist = () => {
 
 // Toggle shuffle
 const toggleShuffle = () => {
-    // Kalau repeat sedang ON, jangan bisa toggle shuffle
     if (repeatMode.value !== 'off') return
 
     shuffleEnabled.value = !shuffleEnabled.value
@@ -75,7 +71,6 @@ const toggleShuffle = () => {
 
 // Toggle repeat mode
 const toggleRepeat = () => {
-    // Kalau shuffle sedang ON, jangan bisa toggle repeat
     if (shuffleEnabled.value) return
 
     const modes = ['off', 'all', 'one']
@@ -145,31 +140,25 @@ const setupAudioEvents = () => {
 
     const updateTime = () => {
         if (!isNaN(audio.currentTime)) {
-            // PERBAIKAN: Hanya trigger handleSongEnd jika user TIDAK sedang seek
             if (duration.value > 0 && audio.currentTime >= duration.value && !isUserSeeking.value) {
-                // Force stop audio dan trigger song end
                 audio.pause()
                 currentTime.value = duration.value
                 handleSongEnd()
                 return
             }
 
-            // CLAMP currentTime agar tidak melebihi duration dari API
             const clampedTime = duration.value > 0
                 ? Math.min(audio.currentTime, duration.value)
                 : audio.currentTime
 
             currentTime.value = clampedTime
         }
-        // JANGAN update duration dari audio element jika sudah ada dari API
-        // karena audio.duration kadang tidak akurat
         if (!duration.value && !isNaN(audio.duration) && audio.duration > 0) {
             duration.value = audio.duration
         }
     }
 
     audio.addEventListener('loadedmetadata', () => {
-        // Hanya set duration jika belum ada dari API
         if (!duration.value && !isNaN(audio.duration)) {
             duration.value = audio.duration
         }
@@ -192,7 +181,6 @@ const setupAudioEvents = () => {
     audio.addEventListener('timeupdate', updateTime)
 
     audio.addEventListener('ended', () => {
-        // Hanya handle jika user tidak sedang seek
         if (!isUserSeeking.value) {
             handleSongEnd()
         }
@@ -216,14 +204,11 @@ const setupAudioEvents = () => {
 // Handle when song ends (with repeat logic)
 const handleSongEnd = () => {
     if (repeatMode.value === 'one') {
-        // Repeat current song
         audioRef.value.currentTime = 0
         audioRef.value.play()
     } else if (repeatMode.value === 'all') {
-        // Go to next song (will loop back to first)
         nextSong()
     } else {
-        // Stop at last song
         if (shuffleEnabled.value) {
             const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
             if (currentPos < shuffledIndices.value.length - 1) {
@@ -314,7 +299,6 @@ const loadAndPlayAudio = async (song) => {
 
     currentTime.value = 0
 
-    // Set duration dari API dulu (lebih akurat)
     if (song.duration) {
         duration.value = song.duration
     }
@@ -384,12 +368,10 @@ const nextSong = async () => {
     let nextIndex
 
     if (shuffleEnabled.value && shuffledIndices.value.length > 0) {
-        // Shuffle mode
         const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
         const nextPos = (currentPos + 1) % shuffledIndices.value.length
         nextIndex = shuffledIndices.value[nextPos]
     } else {
-        // Normal mode
         if (currentIndex.value < songs.value.length - 1) {
             nextIndex = currentIndex.value + 1
         } else {
@@ -406,12 +388,10 @@ const previousSong = async () => {
     let prevIndex
 
     if (shuffleEnabled.value && shuffledIndices.value.length > 0) {
-        // Shuffle mode
         const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
         const prevPos = currentPos - 1 < 0 ? shuffledIndices.value.length - 1 : currentPos - 1
         prevIndex = shuffledIndices.value[prevPos]
     } else {
-        // Normal mode
         if (currentIndex.value > 0) {
             prevIndex = currentIndex.value - 1
         } else {
@@ -429,13 +409,11 @@ const seekTo = (time) => {
     }
 }
 
-// PERBAIKAN: Handle seek start/end untuk mencegah auto-next
 const handleSeekStart = () => {
     isUserSeeking.value = true
 }
 
 const handleSeekEnd = () => {
-    // Delay sedikit sebelum set false untuk memastikan events selesai
     setTimeout(() => {
         isUserSeeking.value = false
     }, 100)
@@ -504,7 +482,6 @@ const toggleLyrics = () => {
                                 <img :src="song.cover" alt="Song Cover"
                                     class="rounded-xl aspect-square object-cover w-full" />
 
-                                <!-- Desktop Hover Overlay - Icon di tengah pas hover -->
                                 <div
                                     class="hidden md:flex absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center pointer-events-none">
                                     <div class="hover:scale-110 transition-transform">
@@ -525,7 +502,6 @@ const toggleLyrics = () => {
                                     </div>
                                 </div>
 
-                                <!-- Mobile Center Icon - PERBAIKAN: Lebih kecil (w-8 h-8) -->
                                 <div v-if="currentSong?.id === song.id"
                                     class="md:hidden absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <div class="bg-black/60 rounded-full p-2">

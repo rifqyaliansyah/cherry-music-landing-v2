@@ -43,7 +43,6 @@ const hasLyrics = computed(() => {
 const currentLineIndex = computed(() => {
     if (!props.currentSong || !hasLyrics.value) return -1
 
-    // Kalau belum sampai lyric pertama, return -1 (belum ada yang aktif)
     if (props.currentTime < lyricsData.value[0].time) {
         return -1
     }
@@ -101,7 +100,6 @@ const syncLyrics = async () => {
 const scrollToActiveLine = async (immediate = false) => {
     if (!isAutoScrollEnabled.value) return
 
-    // Jangan scroll kalau belum waktunya lyric (index -1)
     if (currentLineIndex.value === -1) return
 
     await nextTick()
@@ -141,7 +139,6 @@ watch(currentLineIndex, () => {
 })
 
 const getLineState = (index) => {
-    // Kalau belum ada yang aktif (-1), semua jadi future
     if (currentLineIndex.value === -1) return 'future'
 
     if (index === currentLineIndex.value) return 'active'
@@ -178,7 +175,6 @@ const showLyrics = computed(() => {
 </script>
 
 <template>
-    <!-- Desktop Sidebar -->
     <Transition name="slide-left">
         <div v-if="showLyrics" class="lyrics-sidebar-desktop">
             <div class="flex items-center justify-between px-4 py-5">
@@ -195,12 +191,10 @@ const showLyrics = computed(() => {
             </div>
 
             <div class="relative flex-1 overflow-hidden">
-                <!-- Loading State -->
                 <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
                     <span class="loading loading-spinner loading-lg"></span>
                 </div>
 
-                <!-- No Lyrics State -->
                 <div v-else-if="!hasLyrics" class="h-full flex flex-col items-center justify-center px-4 text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-30 mb-3" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
@@ -210,7 +204,6 @@ const showLyrics = computed(() => {
                     <p class="text-sm opacity-60">Lyrics not available for this song</p>
                 </div>
 
-                <!-- Lyrics Content -->
                 <div v-else ref="lyricsContainerDesktop" @scroll="handleUserScroll"
                     class="h-full overflow-y-auto px-4 py-3 lyrics-container">
                     <div class="py-0">
@@ -222,7 +215,6 @@ const showLyrics = computed(() => {
                     </div>
                 </div>
 
-                <!-- Sync Button Desktop -->
                 <Transition name="fade-slide">
                     <div v-if="showSyncButton && hasLyrics"
                         class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
@@ -240,13 +232,11 @@ const showLyrics = computed(() => {
         </div>
     </Transition>
 
-    <!-- Mobile Backdrop -->
     <Transition name="fade">
         <div v-if="showLyrics" class="lg:hidden fixed inset-0 bg-black/50 z-40" @click="$emit('close')">
         </div>
     </Transition>
 
-    <!-- Mobile Sidebar -->
     <Transition name="slide-left">
         <div v-if="showLyrics"
             class="lg:hidden fixed top-0 right-0 bottom-0 w-full sm:w-80 bg-base-200 shadow-2xl z-50 flex flex-col">
@@ -265,12 +255,10 @@ const showLyrics = computed(() => {
             </div>
 
             <div class="relative flex-1 overflow-hidden">
-                <!-- Loading State -->
                 <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
                     <span class="loading loading-spinner loading-lg"></span>
                 </div>
 
-                <!-- No Lyrics State -->
                 <div v-else-if="!hasLyrics" class="h-full flex flex-col items-center justify-center px-4 text-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 opacity-30 mb-3" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
@@ -280,7 +268,6 @@ const showLyrics = computed(() => {
                     <p class="text-sm opacity-60">Lyrics not available for this song</p>
                 </div>
 
-                <!-- Lyrics Content -->
                 <div v-else ref="lyricsContainerMobile" @scroll="handleUserScroll"
                     class="h-full overflow-y-auto px-4 py-3 lyrics-container">
                     <div class="py-0">
@@ -292,7 +279,6 @@ const showLyrics = computed(() => {
                     </div>
                 </div>
 
-                <!-- Sync Button Mobile -->
                 <Transition name="fade-slide">
                     <div v-if="showSyncButton && hasLyrics"
                         class="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">

@@ -12,9 +12,6 @@ const contentMarginClass = computed(() => {
     return currentSong.value ? 'mb-[105px]' : ''
 })
 
-// Lyrics sidebar always closed on mount
-// No need to restore lyrics state from localStorage
-
 provide('lyricsState', {
     lyricsOpen,
     currentSong,
