@@ -100,8 +100,6 @@ const syncLyrics = async () => {
 const scrollToActiveLine = async (immediate = false) => {
     if (!isAutoScrollEnabled.value) return
 
-    if (currentLineIndex.value === -1) return
-
     await nextTick()
 
     const container = window.innerWidth >= 1024
@@ -109,7 +107,9 @@ const scrollToActiveLine = async (immediate = false) => {
         : lyricsContainerMobile.value
 
     if (container) {
-        const activeLine = container.querySelector(`[data-index="${currentLineIndex.value}"]`)
+        const targetIndex = currentLineIndex.value === -1 ? 0 : currentLineIndex.value
+        const activeLine = container.querySelector(`[data-index="${targetIndex}"]`)
+
         if (activeLine) {
             lastProgrammaticScrollTime.value = Date.now()
             isScrollingProgrammatically.value = true
@@ -135,6 +135,18 @@ const scrollToActiveLine = async (immediate = false) => {
 watch(currentLineIndex, () => {
     if (isAutoScrollEnabled.value) {
         scrollToActiveLine()
+    }
+})
+
+watch(() => props.isOpen, async (newVal) => {
+    if (newVal && hasLyrics.value) {
+        isAutoScrollEnabled.value = true
+        showSyncButton.value = false
+
+        await nextTick()
+        setTimeout(() => {
+            scrollToActiveLine(true)
+        }, 350)
     }
 })
 
