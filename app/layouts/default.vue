@@ -9,7 +9,7 @@ const currentSong = ref(null)
 const currentTime = ref(0)
 
 const contentMarginClass = computed(() => {
-    return currentSong.value ? 'mb-[125px]' : ''
+    return currentSong.value ? 'mb-[105px]' : ''
 })
 
 // Lyrics sidebar always closed on mount

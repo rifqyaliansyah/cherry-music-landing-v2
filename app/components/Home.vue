@@ -237,6 +237,13 @@ const loadAndPlayAudio = async (song) => {
 }
 
 const playSong = async (song, index) => {
+    // Kalau lagu yang sama, toggle play/pause
+    if (currentSong.value?.id === song.id) {
+        togglePlay()
+        return
+    }
+
+    // Kalau lagu berbeda, fetch detail dan play
     const songDetail = await musicStore.fetchSongDetail(song.id)
 
     let songToPlay = songDetail || song
@@ -258,16 +265,6 @@ const togglePlay = () => {
         }, 100)
     } else {
         isPlaying.value = !isPlaying.value
-    }
-}
-
-const togglePlayFromCard = async (song, index, event) => {
-    event.stopPropagation()
-
-    if (currentSong.value?.id === song.id) {
-        togglePlay()
-    } else {
-        await playSong(song, index)
     }
 }
 
@@ -302,9 +299,13 @@ const seekTo = (time) => {
     }
 }
 
-const openLyrics = () => {
+const toggleLyrics = () => {
     if (lyricsState) {
-        lyricsState.openLyrics()
+        if (lyricsState.lyricsOpen.value) {
+            lyricsState.closeLyrics()
+        } else {
+            lyricsState.openLyrics()
+        }
     }
 }
 </script>
@@ -367,10 +368,8 @@ const openLyrics = () => {
                                 <img :src="song.cover" alt="Song Cover"
                                     class="rounded-xl aspect-square object-cover w-full" />
                                 <div
-                                    class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <button @click="togglePlayFromCard(song, index, $event)"
-                                        class="hover:scale-110 transition-transform"
-                                        :disabled="isLoadingAudio && currentSong?.id === song.id">
+                                    class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                    <div class="hover:scale-110 transition-transform">
                                         <svg v-if="currentSong?.id !== song.id || !isPlaying"
                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
                                             class="w-16 h-16 drop-shadow-lg">
@@ -385,7 +384,7 @@ const openLyrics = () => {
                                                 clip-rule="evenodd" />
                                         </svg>
                                         <span v-else class="loading loading-spinner loading-md"></span>
-                                    </button>
+                                    </div>
                                 </div>
 
                                 <div v-if="currentSong?.id === song.id && isPlaying"
@@ -418,7 +417,7 @@ const openLyrics = () => {
 
         <MusicPlayerBar :current-song="currentSong" :is-playing="isPlaying" :current-time="currentTime"
             :duration="duration" @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
-            @open-lyrics="openLyrics" />
+            @open-lyrics="toggleLyrics" />
     </div>
 </template>
 

@@ -59,9 +59,7 @@ const handleMouseUp = () => {
     document.removeEventListener('mouseup', handleMouseUp)
 }
 
-// PERBAIKAN DI SINI
 const formatTime = (seconds) => {
-    // Bulatkan dulu untuk menghindari floating point issues
     const roundedSeconds = Math.floor(seconds)
     const mins = Math.floor(roundedSeconds / 60)
     const secs = roundedSeconds % 60
@@ -86,10 +84,10 @@ const formatTime = (seconds) => {
                     </div>
 
                     <!-- Play Controls - Center -->
-                    <div class="flex-1 flex flex-col items-center gap-2 max-w-[722px] -ml-4 md:ml-0">
+                    <div class="flex-1 flex flex-col items-center gap-2 max-w-[500px] -ml-4 md:ml-0">
                         <div class="flex items-center gap-2">
                             <!-- Repeat Button -->
-                            <button class="btn btn-square btn-sm">
+                            <button class="btn btn-square btn-neutral btn-sm">
                                 <svg width="16" height="16" viewBox="0 0 48 48" fill="none"
                                     xmlns="http://www.w3.org/2000/svg">
                                     <path d="M40 33L44 37L40 41" stroke="currentColor" stroke-width="4"
@@ -134,7 +132,7 @@ const formatTime = (seconds) => {
                             </button>
 
                             <!-- Shuffle Button -->
-                            <button class="btn btn-square btn-sm">
+                            <button class="btn btn-square btn-neutral btn-sm">
                                 <svg width="16" height="16" viewBox="0 0 48 48" fill="none"
                                     xmlns="http://www.w3.org/2000/svg">
                                     <path d="M4 25C4 18.3502 9.39624 13 16 13H44" stroke="currentColor" stroke-width="4"
@@ -150,24 +148,23 @@ const formatTime = (seconds) => {
                         </div>
 
                         <!-- Progress Bar - DRAGGABLE -->
-                        <div class="w-full">
-                            <div class="relative cursor-pointer select-none" @click="handleProgressClick"
+                        <div class="w-full flex items-center gap-2">
+                            <span class="text-xs opacity-50 text-right pt-1">{{ formatTime(currentTime)
+                                }}</span>
+                            <div class="relative cursor-pointer select-none flex-1" @click="handleProgressClick"
                                 @mousedown="handleMouseDown" ref="progressBar">
                                 <progress class="progress pointer-events-none" :value="progress" max="100"></progress>
                             </div>
-                            <div class="flex justify-between text-xs opacity-50 mt-1">
-                                <span>{{ formatTime(currentTime) }}</span>
-                                <span>{{ formatTime(duration) }}</span>
-                            </div>
+                            <span class="text-xs opacity-50 pt-1">{{ formatTime(duration) }}</span>
                         </div>
                     </div>
 
                     <!-- Extra Controls - Right -->
                     <div class="hidden lg:flex items-center gap-2 w-[30%] justify-end">
-                        <button @click="$emit('open-lyrics')" class="btn btn-square btn-sm">
+                        <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-sm">
                             <ListMusic :size="16" />
                         </button>
-                        <button class="btn btn-square btn-sm">
+                        <button class="btn btn-square btn-neutral btn-sm">
                             <svg width="16" height="16" viewBox="0 0 48 48" fill="none"
                                 xmlns="http://www.w3.org/2000/svg">
                                 <path

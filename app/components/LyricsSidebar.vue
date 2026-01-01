@@ -316,7 +316,7 @@ const showLyrics = computed(() => {
     position: fixed;
     top: 0;
     right: 0;
-    bottom: 125px;
+    bottom: 105px;
     width: 20rem;
     background-color: oklch(var(--b2));
     box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
@@ -356,18 +356,16 @@ const showLyrics = computed(() => {
 }
 
 .lyric-line.future {
-    font-size: 0.875rem;
     opacity: 0.3;
     filter: blur(0.5px);
     transform: scale(0.95);
 }
 
 .lyric-line.active {
-    font-size: 1.125rem;
     font-weight: 700;
     opacity: 1;
     filter: blur(0);
-    transform: scale(1);
+    transform: scale(1.05);
     text-shadow:
         0 0 20px oklch(var(--p) / 0.5),
         0 0 40px oklch(var(--p) / 0.3),
@@ -376,7 +374,6 @@ const showLyrics = computed(() => {
 }
 
 .lyric-line.past {
-    font-size: 0.875rem;
     opacity: 0.25;
     filter: blur(0.5px);
     transform: scale(0.95);
