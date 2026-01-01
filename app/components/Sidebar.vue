@@ -1,5 +1,5 @@
 <script setup>
-import { ListMusic } from 'lucide-vue-next'
+import { ListMusic, SlidersHorizontal } from 'lucide-vue-next'
 
 const closeDrawer = () => {
     if (window.innerWidth < 1024) {
@@ -22,22 +22,22 @@ const closeDrawer = () => {
                 <li>
                     <NuxtLink to="/" @click="closeDrawer"
                         class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
-                        data-tip="All Songs">
+                        data-tip="All Music">
                         <ListMusic class="my-1.5 inline-block size-4" />
-                        <span class="is-drawer-close:hidden">All Songs</span>
-                    </NuxtLink>
-                </li>
-
-                <!-- <li>
-                    <NuxtLink to="/playlist" @click="closeDrawer"
-                        class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
-                        data-tip="Playlist">
-                        <ListMusic class="my-1.5 inline-block size-4" />
-                        <span class="is-drawer-close:hidden">Playlist</span>
+                        <span class="is-drawer-close:hidden">All Music</span>
                     </NuxtLink>
                 </li>
 
                 <li>
+                    <NuxtLink to="/music" @click="closeDrawer"
+                        class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
+                        data-tip="Manage Music">
+                        <SlidersHorizontal class="my-1.5 inline-block size-4" />
+                        <span class="is-drawer-close:hidden">Manage Music</span>
+                    </NuxtLink>
+                </li>
+
+                <!-- <li>
                     <NuxtLink to="/like" @click="closeDrawer"
                         class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
                         data-tip="Liked Music">
