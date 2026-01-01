@@ -438,7 +438,7 @@ const toggleLyrics = () => {
 </script>
 
 <template>
-    <div class="pb-32">
+    <div class="pb-0">
         <audio ref="audioRef" preload="auto" style="display: none;"></audio>
 
         <div v-if="isLoadingAudio"
