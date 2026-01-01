@@ -4,11 +4,6 @@ import { useMusicStore } from '~/stores/music'
 
 const musicStore = useMusicStore()
 
-// Fetch songs saat component mounted
-onMounted(() => {
-    musicStore.fetchSongs()
-})
-
 const songs = computed(() => musicStore.songs)
 const loading = computed(() => musicStore.loading)
 const error = computed(() => musicStore.error)
@@ -18,9 +13,8 @@ const currentIndex = ref(-1)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
-const isLoadingAudio = ref(false) // Tambah state untuk loading audio
+const isLoadingAudio = ref(false)
 
-// Tambahkan audio element
 const audioRef = ref(null)
 
 const lyricsState = inject('lyricsState')
@@ -32,13 +26,69 @@ const gridClass = computed(() => {
     return 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5'
 })
 
-// Setup audio events
+const skeletonCount = computed(() => {
+    if (lyricsState?.lyricsOpen.value) {
+        return 8
+    }
+    return 10
+})
+
+// Restore player state dari localStorage
+const restorePlayerState = async () => {
+    const savedState = musicStore.loadPlayerState()
+
+    if (!savedState || !savedState.currentSong) {
+        return
+    }
+
+    // Validate if song still exists
+    const isValid = await musicStore.validateSavedSong(savedState.currentSong.id)
+
+    if (!isValid) {
+        return
+    }
+
+    // Get fresh data from songs list (updated dari API)
+    const freshSong = songs.value.find(s => s.id === savedState.currentSong.id)
+
+    if (!freshSong) {
+        musicStore.clearPlayerState()
+        return
+    }
+
+    // Fetch detail (termasuk lyrics) dari API
+    const songDetail = await musicStore.fetchSongDetail(freshSong.id)
+    const songToRestore = songDetail || freshSong
+
+    // Restore dengan data yang fresh
+    currentSong.value = songToRestore
+    currentIndex.value = songs.value.findIndex(s => s.id === freshSong.id)
+
+    // Sync with layout
+    if (lyricsState) {
+        lyricsState.setCurrentSong(songToRestore)
+    }
+
+    // Load audio (tapi jangan auto play)
+    if (audioRef.value) {
+        audioRef.value.src = songToRestore.audio_url
+        audioRef.value.load()
+        duration.value = songToRestore.duration || 0
+    }
+}
+
+// Fetch songs dan restore state
+onMounted(async () => {
+    await musicStore.fetchSongs()
+    await restorePlayerState()
+    setupAudioEvents()
+})
+
 const setupAudioEvents = () => {
     if (!audioRef.value) return
 
     const audio = audioRef.value
 
-    // Update waktu saat audio diputar
     const updateTime = () => {
         if (!isNaN(audio.currentTime)) {
             currentTime.value = audio.currentTime
@@ -48,14 +98,12 @@ const setupAudioEvents = () => {
         }
     }
 
-    // Saat audio bisa diputar (metadata loaded)
     audio.addEventListener('loadedmetadata', () => {
         if (!isNaN(audio.duration)) {
             duration.value = audio.duration
         }
     })
 
-    // Saat audio siap diputar
     audio.addEventListener('canplay', () => {
         isLoadingAudio.value = false
         if (isPlaying.value) {
@@ -66,30 +114,24 @@ const setupAudioEvents = () => {
         }
     })
 
-    // Saat mulai loading audio
     audio.addEventListener('loadstart', () => {
         isLoadingAudio.value = true
     })
 
-    // Saat waktu berubah
     audio.addEventListener('timeupdate', updateTime)
 
-    // Saat audio selesai
     audio.addEventListener('ended', () => {
         nextSong()
     })
 
-    // Saat audio mulai diputar
     audio.addEventListener('play', () => {
         isPlaying.value = true
     })
 
-    // Saat audio dijeda
     audio.addEventListener('pause', () => {
         isPlaying.value = false
     })
 
-    // Handle error
     audio.addEventListener('error', (e) => {
         console.error('Audio error:', e)
         isLoadingAudio.value = false
@@ -97,26 +139,25 @@ const setupAudioEvents = () => {
     })
 }
 
-// Inisialisasi audio element saat mounted
-onMounted(() => {
-    setupAudioEvents()
-})
-
-// Sync currentSong dengan layout
 watch(currentSong, (newSong) => {
     if (lyricsState) {
         lyricsState.setCurrentSong(newSong)
     }
+
+    // Save to localStorage whenever song changes
+    if (newSong) {
+        musicStore.savePlayerState(newSong, currentIndex.value)
+    } else {
+        musicStore.clearPlayerState()
+    }
 })
 
-// Sync currentTime dengan layout
 watch(currentTime, (time) => {
     if (lyricsState) {
         lyricsState.setCurrentTime(time)
     }
 })
 
-// Watch perubahan dari layout (ketika lyric diklik)
 watch(() => lyricsState?.currentTime.value, (newTime) => {
     if (newTime !== undefined && newTime !== currentTime.value && audioRef.value) {
         audioRef.value.currentTime = newTime
@@ -124,22 +165,18 @@ watch(() => lyricsState?.currentTime.value, (newTime) => {
     }
 })
 
-// Control audio berdasarkan isPlaying state
 watch(isPlaying, async (playing) => {
     if (!audioRef.value || !currentSong.value) return
 
-    // Tunggu sebentar untuk memastikan audio sudah siap
     await nextTick()
 
     if (playing) {
-        // Cek apakah audio sudah siap
-        if (audioRef.value.readyState >= 2) { // HAVE_CURRENT_DATA atau lebih
+        if (audioRef.value.readyState >= 2) {
             audioRef.value.play().catch(err => {
                 console.error('Error playing audio:', err)
                 isPlaying.value = false
             })
         } else {
-            // Tunggu sampai audio siap
             const playWhenReady = () => {
                 audioRef.value.play().catch(err => {
                     console.error('Error playing audio:', err)
@@ -167,17 +204,13 @@ const loadAndPlayAudio = async (song) => {
     isLoadingAudio.value = true
     isPlaying.value = false
 
-    // Reset current time
     currentTime.value = 0
 
-    // Set source audio
     audioRef.value.src = song.audio_url
     audioRef.value.load()
 
-    // Set duration dari data song (fallback)
     duration.value = song.duration || 0
 
-    // Tunggu audio siap
     return new Promise((resolve) => {
         const onCanPlay = () => {
             audioRef.value.removeEventListener('canplay', onCanPlay)
@@ -194,7 +227,6 @@ const loadAndPlayAudio = async (song) => {
         audioRef.value.addEventListener('canplay', onCanPlay)
         audioRef.value.addEventListener('error', onError)
 
-        // Timeout fallback
         setTimeout(() => {
             audioRef.value.removeEventListener('canplay', onCanPlay)
             audioRef.value.removeEventListener('error', onError)
@@ -205,19 +237,15 @@ const loadAndPlayAudio = async (song) => {
 }
 
 const playSong = async (song, index) => {
-    // Fetch detail song termasuk lyrics
     const songDetail = await musicStore.fetchSongDetail(song.id)
 
     let songToPlay = songDetail || song
 
-    // Update current song
     currentSong.value = songToPlay
     currentIndex.value = index
 
-    // Load dan play audio
     await loadAndPlayAudio(songToPlay)
 
-    // Set playing state setelah audio siap
     isPlaying.value = true
 }
 
@@ -225,7 +253,6 @@ const togglePlay = () => {
     if (!currentSong.value) return
 
     if (isLoadingAudio.value) {
-        // Jika masih loading, tunggu sebentar
         setTimeout(() => {
             isPlaying.value = !isPlaying.value
         }, 100)
@@ -251,7 +278,6 @@ const nextSong = async () => {
         currentIndex.value++
         await playSong(songs.value[currentIndex.value], currentIndex.value)
     } else {
-        // Kembali ke lagu pertama
         currentIndex.value = 0
         await playSong(songs.value[0], 0)
     }
@@ -264,7 +290,6 @@ const previousSong = async () => {
         currentIndex.value--
         await playSong(songs.value[currentIndex.value], currentIndex.value)
     } else {
-        // Pergi ke lagu terakhir
         currentIndex.value = songs.value.length - 1
         await playSong(songs.value[songs.value.length - 1], songs.value.length - 1)
     }
@@ -300,9 +325,17 @@ const openLyrics = () => {
                 <h1 class="text-xs font-bold opacity-60">Created by you</h1>
                 <h1 class="text-3xl font-bold mb-6">All Songs</h1>
 
-                <!-- Loading State -->
-                <div v-if="loading" class="flex items-center justify-center py-20">
-                    <span class="loading loading-spinner loading-lg"></span>
+                <!-- Loading State with Skeleton -->
+                <div v-if="loading" class="grid gap-4 transition-all duration-300" :class="gridClass">
+                    <div v-for="i in skeletonCount" :key="i" class="card bg-base-100 shadow-md">
+                        <figure class="px-4 pt-4">
+                            <div class="skeleton w-full aspect-square rounded-xl"></div>
+                        </figure>
+                        <div class="card-body p-4">
+                            <div class="skeleton h-5 w-3/4 mb-2"></div>
+                            <div class="skeleton h-4 w-1/2"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Error State -->

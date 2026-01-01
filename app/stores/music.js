@@ -1,12 +1,13 @@
 // app/stores/music.js
 import { defineStore } from 'pinia'
 
+const STORAGE_KEY = 'music_player_state'
+
 export const useMusicStore = defineStore('music', {
     state: () => ({
         songs: [],
         loading: false,
         error: null,
-        // Detail songs cache (key: songId, value: song detail with lyrics)
         songDetails: {},
         loadingDetail: false,
         errorDetail: null
@@ -38,11 +39,10 @@ export const useMusicStore = defineStore('music', {
                 const response = await $fetch(`${apiBaseUrl}/songs`)
 
                 if (response.success && response.data) {
-                    // Map API response ke format yang dipakai di component
                     this.songs = response.data.map(song => ({
                         id: song.id,
                         title: song.title,
-                        name: song.artist, // API pakai 'artist', component pakai 'name'
+                        name: song.artist,
                         cover: song.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
                         duration: song.duration,
                         audio_url: song.audio_url,
@@ -52,14 +52,13 @@ export const useMusicStore = defineStore('music', {
             } catch (err) {
                 this.error = err.message || 'Failed to fetch songs'
                 console.error('Error fetching songs:', err)
-                this.songs = [] // Clear songs on error
+                this.songs = []
             } finally {
                 this.loading = false
             }
         },
 
         async fetchSongDetail(songId) {
-            // Check cache first
             if (this.songDetails[songId]) {
                 return this.songDetails[songId]
             }
@@ -85,7 +84,6 @@ export const useMusicStore = defineStore('music', {
                         lyrics: response.data.lyrics || []
                     }
 
-                    // Cache the detail
                     this.songDetails[songId] = songDetail
 
                     return songDetail
@@ -105,6 +103,90 @@ export const useMusicStore = defineStore('music', {
             } else {
                 this.songDetails = {}
             }
+        },
+
+        // LocalStorage actions
+        savePlayerState(song, index) {
+            if (!song) {
+                this.clearPlayerState()
+                return
+            }
+
+            try {
+                const state = {
+                    currentSong: {
+                        id: song.id,
+                        title: song.title,
+                        name: song.name,
+                        cover: song.cover,
+                        duration: song.duration,
+                        audio_url: song.audio_url,
+                        youtube_url: song.youtube_url,
+                        lyrics: song.lyrics || []
+                    },
+                    currentIndex: index,
+                    timestamp: Date.now()
+                }
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+            } catch (err) {
+                console.error('Error saving player state:', err)
+            }
+        },
+
+        loadPlayerState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY)
+                if (!saved) return null
+
+                const state = JSON.parse(saved)
+
+                // Validate state structure
+                if (!state.currentSong || !state.currentSong.id) {
+                    this.clearPlayerState()
+                    return null
+                }
+
+                return state
+            } catch (err) {
+                console.error('Error loading player state:', err)
+                this.clearPlayerState()
+                return null
+            }
+        },
+
+        clearPlayerState() {
+            try {
+                localStorage.removeItem(STORAGE_KEY)
+            } catch (err) {
+                console.error('Error clearing player state:', err)
+            }
+        },
+
+        // Validate if saved song still exists
+        async validateSavedSong(songId) {
+            // Wait for songs to be loaded
+            if (this.loading) {
+                await new Promise(resolve => {
+                    const checkInterval = setInterval(() => {
+                        if (!this.loading) {
+                            clearInterval(checkInterval)
+                            resolve()
+                        }
+                    }, 100)
+                })
+            }
+
+            // Check if song exists in current songs list
+            const songExists = this.songs.some(song => song.id === songId)
+
+            if (!songExists) {
+                console.warn(`Song ${songId} not found, clearing player state`)
+                this.clearPlayerState()
+                return false
+            }
+
+            return true
         }
     }
 })

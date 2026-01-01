@@ -1,5 +1,8 @@
 <script setup>
-import { provide, ref, computed } from 'vue'
+import { provide, ref, computed, onMounted } from 'vue'
+import { useMusicStore } from '~/stores/music'
+
+const musicStore = useMusicStore()
 
 const lyricsOpen = ref(false)
 const currentSong = ref(null)
@@ -9,15 +12,22 @@ const contentMarginClass = computed(() => {
     return currentSong.value ? 'mb-[125px]' : ''
 })
 
+// Lyrics sidebar always closed on mount
+// No need to restore lyrics state from localStorage
+
 provide('lyricsState', {
     lyricsOpen,
     currentSong,
     currentTime,
-    openLyrics: () => { lyricsOpen.value = true },
-    closeLyrics: () => { lyricsOpen.value = false },
+    openLyrics: () => {
+        lyricsOpen.value = true
+    },
+    closeLyrics: () => {
+        lyricsOpen.value = false
+    },
     setCurrentSong: (song) => { currentSong.value = song },
     setCurrentTime: (time) => { currentTime.value = time },
-    seekTo: (time) => { currentTime.value = time } // Tambahkan ini
+    seekTo: (time) => { currentTime.value = time }
 })
 
 const handleLyricsSeek = (time) => {
