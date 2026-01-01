@@ -106,11 +106,13 @@ const formatTime = (seconds) => {
                     </div>
 
                     <!-- Play Controls - Center -->
-                    <div class="flex-1 flex flex-col items-center gap-2 max-w-[500px] -ml-4 md:ml-0">
+                    <div class="flex-1 flex flex-col items-center gap-2 max-w-[500px] -ml-12 md:-ml-4 lg:ml-0">
                         <div class="flex items-center gap-2">
                             <!-- Shuffle Button -->
-                            <button @click="$emit('toggle-shuffle')" class="btn btn-square btn-neutral btn-xs"
-                                :class="{ 'btn-primary': shuffleEnabled }">
+                            <button @click="$emit('toggle-shuffle')" class="btn btn-square btn-neutral btn-xs" :class="{
+                                'btn-primary': shuffleEnabled,
+                                'btn-disabled opacity-30 cursor-not-allowed': repeatMode !== 'off'
+                            }" :disabled="repeatMode !== 'off'">
                                 <svg width="12" height="12" viewBox="0 0 48 48" fill="none"
                                     xmlns="http://www.w3.org/2000/svg">
                                     <path d="M40 33L44 37L40 41" stroke="currentColor" stroke-width="4"
@@ -156,7 +158,10 @@ const formatTime = (seconds) => {
 
                             <!-- Repeat Button -->
                             <button @click="$emit('toggle-repeat')" class="btn btn-square btn-neutral btn-xs relative"
-                                :class="{ 'btn-primary': repeatMode !== 'off' }">
+                                :class="{
+                                    'btn-primary': repeatMode !== 'off',
+                                    'btn-disabled opacity-30 cursor-not-allowed': shuffleEnabled
+                                }" :disabled="shuffleEnabled">
                                 <svg width="12" height="12" viewBox="0 0 48 48" fill="none"
                                     xmlns="http://www.w3.org/2000/svg">
                                     <path d="M44 23C44 29.6498 38.6038 35 32 35H4" stroke="currentColor"
@@ -188,15 +193,19 @@ const formatTime = (seconds) => {
                     </div>
 
                     <!-- Extra Controls - Right -->
-                    <div class="hidden lg:flex items-center gap-2 w-[30%] justify-end">
-                        <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-sm">
-                            <ListMusic :size="16" />
+                    <div class="flex flex-col lg:flex-row items-center gap-2 lg:gap-2 w-[30%] justify-end">
+                        <!-- Lyrics Button - Show on all screens -->
+                        <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-xs lg:btn-sm">
+                            <ListMusic :size="14" class="lg:hidden" />
+                            <ListMusic :size="16" class="hidden lg:block" />
                         </button>
 
-                        <!-- Mute/Unmute Toggle -->
-                        <button @click="toggleMute" class="btn btn-square btn-neutral btn-sm">
-                            <Volume2 v-if="volume > 0" :size="16" />
-                            <VolumeX v-else :size="16" />
+                        <!-- Mute/Unmute Toggle - Show on all screens -->
+                        <button @click="toggleMute" class="btn btn-square btn-neutral btn-xs lg:btn-sm">
+                            <Volume2 v-if="volume > 0" :size="14" class="lg:hidden" />
+                            <Volume2 v-if="volume > 0" :size="16" class="hidden lg:block" />
+                            <VolumeX v-if="volume === 0" :size="14" class="lg:hidden" />
+                            <VolumeX v-if="volume === 0" :size="16" class="hidden lg:block" />
                         </button>
                     </div>
                 </div>
