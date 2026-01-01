@@ -63,12 +63,18 @@ const shufflePlaylist = () => {
 
 // Toggle shuffle
 const toggleShuffle = () => {
+    // Kalau repeat sedang ON, jangan bisa toggle shuffle
+    if (repeatMode.value !== 'off') return
+
     shuffleEnabled.value = !shuffleEnabled.value
     shufflePlaylist()
 }
 
 // Toggle repeat mode
 const toggleRepeat = () => {
+    // Kalau shuffle sedang ON, jangan bisa toggle repeat
+    if (shuffleEnabled.value) return
+
     const modes = ['off', 'all', 'one']
     const currentModeIndex = modes.indexOf(repeatMode.value)
     repeatMode.value = modes[(currentModeIndex + 1) % modes.length]
@@ -479,8 +485,10 @@ const toggleLyrics = () => {
                             <div class="relative w-full">
                                 <img :src="song.cover" alt="Song Cover"
                                     class="rounded-xl aspect-square object-cover w-full" />
+
+                                <!-- Desktop Hover Overlay -->
                                 <div
-                                    class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                    class="hidden md:block absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                     <div class="hover:scale-110 transition-transform">
                                         <svg v-if="currentSong?.id !== song.id || !isPlaying"
                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
@@ -491,6 +499,25 @@ const toggleLyrics = () => {
                                         <svg v-else-if="isPlaying && currentSong?.id === song.id"
                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
                                             class="w-16 h-16 drop-shadow-lg">
+                                            <path fill-rule="evenodd"
+                                                d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                        <span v-else class="loading loading-spinner loading-md"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Mobile Center Icon - Always visible if current song -->
+                                <div v-if="currentSong?.id === song.id"
+                                    class="md:hidden absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div class="bg-black/60 rounded-full p-3">
+                                        <svg v-if="!isPlaying" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                            fill="white" class="w-12 h-12 drop-shadow-lg">
+                                            <path
+                                                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                                        </svg>
+                                        <svg v-else-if="isPlaying" xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24" fill="white" class="w-12 h-12 drop-shadow-lg">
                                             <path fill-rule="evenodd"
                                                 d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"
                                                 clip-rule="evenodd" />

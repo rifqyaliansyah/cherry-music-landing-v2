@@ -33,11 +33,11 @@ watch(() => props.currentTime, (time) => {
     }
 })
 
-const handleProgressInteraction = (e) => {
+const handleProgressInteraction = (clientX) => {
     if (!progressBar.value || !props.duration) return
 
     const rect = progressBar.value.getBoundingClientRect()
-    const clickX = e.clientX - rect.left
+    const clickX = clientX - rect.left
     const percentage = (clickX / rect.width) * 100
 
     const newProgress = Math.max(0, Math.min(100, percentage))
@@ -48,12 +48,12 @@ const handleProgressInteraction = (e) => {
 }
 
 const handleProgressClick = (e) => {
-    handleProgressInteraction(e)
+    handleProgressInteraction(e.clientX)
 }
 
 const handleMouseDown = (e) => {
     isDragging.value = true
-    handleProgressInteraction(e)
+    handleProgressInteraction(e.clientX)
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
@@ -61,7 +61,7 @@ const handleMouseDown = (e) => {
 
 const handleMouseMove = (e) => {
     if (isDragging.value) {
-        handleProgressInteraction(e)
+        handleProgressInteraction(e.clientX)
     }
 }
 
@@ -69,6 +69,30 @@ const handleMouseUp = () => {
     isDragging.value = false
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
+}
+
+// Touch events for mobile
+const handleTouchStart = (e) => {
+    isDragging.value = true
+    const touch = e.touches[0]
+    handleProgressInteraction(touch.clientX)
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+    document.addEventListener('touchend', handleTouchEnd)
+}
+
+const handleTouchMove = (e) => {
+    if (isDragging.value) {
+        e.preventDefault() // Prevent scrolling while dragging
+        const touch = e.touches[0]
+        handleProgressInteraction(touch.clientX)
+    }
+}
+
+const handleTouchEnd = () => {
+    isDragging.value = false
+    document.removeEventListener('touchmove', handleTouchMove)
+    document.removeEventListener('touchend', handleTouchEnd)
 }
 
 const toggleMute = () => {
@@ -184,8 +208,9 @@ const formatTime = (seconds) => {
                         <!-- Progress Bar - DRAGGABLE -->
                         <div class="w-full flex items-center gap-2">
                             <span class="text-xs opacity-50 text-right pt-1">{{ formatTime(currentTime) }}</span>
-                            <div class="relative cursor-pointer select-none flex-1" @click="handleProgressClick"
-                                @mousedown="handleMouseDown" ref="progressBar">
+                            <div class="relative cursor-pointer select-none flex-1 touch-none"
+                                @click="handleProgressClick" @mousedown="handleMouseDown" @touchstart="handleTouchStart"
+                                ref="progressBar">
                                 <progress class="progress pointer-events-none" :value="progress" max="100"></progress>
                             </div>
                             <span class="text-xs opacity-50 pt-1">{{ formatTime(duration) }}</span>
