@@ -280,7 +280,7 @@ onUnmounted(() => {
                         <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
                             class="lyric-line cursor-pointer" :class="getLineState(index)"
                             @click="handleLyricClick(line.time)">
-                            {{ line.text || '♫' }}
+                            {{ line.text || '♫ ♫ ♫' }}
                         </div>
                     </div>
                 </div>
@@ -407,7 +407,7 @@ onUnmounted(() => {
                         <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
                             class="lyric-line-fullscreen cursor-pointer" :class="getLineState(index)"
                             @click="handleLyricClick(line.time)">
-                            {{ line.text || '♫' }}
+                            {{ line.text || '♫ ♫ ♫' }}
                         </div>
                     </div>
                 </div>
