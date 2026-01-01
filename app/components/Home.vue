@@ -116,7 +116,9 @@ const restorePlayerState = async () => {
     if (audioRef.value) {
         audioRef.value.src = songToRestore.audio_url
         audioRef.value.load()
-        duration.value = songToRestore.duration || 0
+        if (songToRestore.duration) {
+            duration.value = songToRestore.duration
+        }
         audioRef.value.volume = volume.value
     }
 }
@@ -134,15 +136,32 @@ const setupAudioEvents = () => {
 
     const updateTime = () => {
         if (!isNaN(audio.currentTime)) {
-            currentTime.value = audio.currentTime
+            // Cek apakah sudah melebihi duration dari API
+            if (duration.value > 0 && audio.currentTime >= duration.value) {
+                // Force stop audio dan trigger song end
+                audio.pause()
+                currentTime.value = duration.value
+                handleSongEnd()
+                return
+            }
+
+            // CLAMP currentTime agar tidak melebihi duration dari API
+            const clampedTime = duration.value > 0
+                ? Math.min(audio.currentTime, duration.value)
+                : audio.currentTime
+
+            currentTime.value = clampedTime
         }
-        if (!isNaN(audio.duration) && audio.duration > 0) {
+        // JANGAN update duration dari audio element jika sudah ada dari API
+        // karena audio.duration kadang tidak akurat
+        if (!duration.value && !isNaN(audio.duration) && audio.duration > 0) {
             duration.value = audio.duration
         }
     }
 
     audio.addEventListener('loadedmetadata', () => {
-        if (!isNaN(audio.duration)) {
+        // Hanya set duration jika belum ada dari API
+        if (!duration.value && !isNaN(audio.duration)) {
             duration.value = audio.duration
         }
     })
@@ -283,11 +302,14 @@ const loadAndPlayAudio = async (song) => {
 
     currentTime.value = 0
 
+    // Set duration dari API dulu (lebih akurat)
+    if (song.duration) {
+        duration.value = song.duration
+    }
+
     audioRef.value.src = song.audio_url
     audioRef.value.load()
     audioRef.value.volume = volume.value
-
-    duration.value = song.duration || 0
 
     return new Promise((resolve) => {
         const onCanPlay = () => {

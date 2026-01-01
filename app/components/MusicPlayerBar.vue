@@ -80,7 +80,9 @@ const toggleMute = () => {
 }
 
 const formatTime = (seconds) => {
-    const roundedSeconds = Math.floor(seconds)
+    // Batasi seconds agar tidak melebihi duration
+    const clampedSeconds = Math.min(seconds, props.duration || seconds)
+    const roundedSeconds = Math.floor(clampedSeconds)
     const mins = Math.floor(roundedSeconds / 60)
     const secs = roundedSeconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
