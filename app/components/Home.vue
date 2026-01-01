@@ -547,7 +547,7 @@ const toggleLyrics = () => {
                             </div>
                         </figure>
                         <div class="card-body p-4">
-                            <h2 class="card-title text-base truncate">{{ song.title }}</h2>
+                            <h2 class="card-title text-base line-clamp-2 leading-tight">{{ song.title }}</h2>
                             <p class="text-xs opacity-60 truncate">{{ song.name }}</p>
                         </div>
                     </div>
