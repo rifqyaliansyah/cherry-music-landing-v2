@@ -21,6 +21,9 @@ const repeatMode = ref('off') // 'off', 'all', 'one'
 const volume = ref(1) // 0 - 1
 const shuffledIndices = ref([])
 
+// Flag untuk mencegah auto-next saat user sedang drag progress bar
+const isUserSeeking = ref(false)
+
 const audioRef = ref(null)
 
 const lyricsState = inject('lyricsState')
@@ -142,8 +145,8 @@ const setupAudioEvents = () => {
 
     const updateTime = () => {
         if (!isNaN(audio.currentTime)) {
-            // Cek apakah sudah melebihi duration dari API
-            if (duration.value > 0 && audio.currentTime >= duration.value) {
+            // PERBAIKAN: Hanya trigger handleSongEnd jika user TIDAK sedang seek
+            if (duration.value > 0 && audio.currentTime >= duration.value && !isUserSeeking.value) {
                 // Force stop audio dan trigger song end
                 audio.pause()
                 currentTime.value = duration.value
@@ -189,7 +192,10 @@ const setupAudioEvents = () => {
     audio.addEventListener('timeupdate', updateTime)
 
     audio.addEventListener('ended', () => {
-        handleSongEnd()
+        // Hanya handle jika user tidak sedang seek
+        if (!isUserSeeking.value) {
+            handleSongEnd()
+        }
     })
 
     audio.addEventListener('play', () => {
@@ -423,6 +429,18 @@ const seekTo = (time) => {
     }
 }
 
+// PERBAIKAN: Handle seek start/end untuk mencegah auto-next
+const handleSeekStart = () => {
+    isUserSeeking.value = true
+}
+
+const handleSeekEnd = () => {
+    // Delay sedikit sebelum set false untuk memastikan events selesai
+    setTimeout(() => {
+        isUserSeeking.value = false
+    }, 100)
+}
+
 const toggleLyrics = () => {
     if (lyricsState) {
         if (lyricsState.lyricsOpen.value) {
@@ -486,9 +504,9 @@ const toggleLyrics = () => {
                                 <img :src="song.cover" alt="Song Cover"
                                     class="rounded-xl aspect-square object-cover w-full" />
 
-                                <!-- Desktop Hover Overlay -->
+                                <!-- Desktop Hover Overlay - Icon di tengah pas hover -->
                                 <div
-                                    class="hidden md:block absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                    class="hidden md:flex absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center pointer-events-none">
                                     <div class="hover:scale-110 transition-transform">
                                         <svg v-if="currentSong?.id !== song.id || !isPlaying"
                                             xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"
@@ -507,17 +525,17 @@ const toggleLyrics = () => {
                                     </div>
                                 </div>
 
-                                <!-- Mobile Center Icon - Always visible if current song -->
+                                <!-- Mobile Center Icon - PERBAIKAN: Lebih kecil (w-8 h-8) -->
                                 <div v-if="currentSong?.id === song.id"
                                     class="md:hidden absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div class="bg-black/60 rounded-full p-3">
+                                    <div class="bg-black/60 rounded-full p-2">
                                         <svg v-if="!isPlaying" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                            fill="white" class="w-12 h-12 drop-shadow-lg">
+                                            fill="white" class="w-8 h-8 drop-shadow-lg">
                                             <path
                                                 d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
                                         </svg>
                                         <svg v-else-if="isPlaying" xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24" fill="white" class="w-12 h-12 drop-shadow-lg">
+                                            viewBox="0 0 24 24" fill="white" class="w-8 h-8 drop-shadow-lg">
                                             <path fill-rule="evenodd"
                                                 d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0A.75.75 0 0 1 15 4.5h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"
                                                 clip-rule="evenodd" />
@@ -558,7 +576,7 @@ const toggleLyrics = () => {
             :duration="duration" :shuffle-enabled="shuffleEnabled" :repeat-mode="repeatMode" :volume="volume"
             @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
             @open-lyrics="toggleLyrics" @toggle-shuffle="toggleShuffle" @toggle-repeat="toggleRepeat"
-            @volume-change="handleVolumeChange" />
+            @volume-change="handleVolumeChange" @seek-start="handleSeekStart" @seek-end="handleSeekEnd" />
     </div>
 </template>
 

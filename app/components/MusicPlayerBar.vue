@@ -20,7 +20,9 @@ const emit = defineEmits([
     'open-lyrics',
     'toggle-shuffle',
     'toggle-repeat',
-    'volume-change'
+    'volume-change',
+    'seek-start',
+    'seek-end'
 ])
 
 const progressBar = ref(null)
@@ -48,11 +50,17 @@ const handleProgressInteraction = (clientX) => {
 }
 
 const handleProgressClick = (e) => {
+    emit('seek-start') // PERBAIKAN: Emit seek start
     handleProgressInteraction(e.clientX)
+    // Delay sedikit sebelum emit seek end
+    setTimeout(() => {
+        emit('seek-end')
+    }, 50)
 }
 
 const handleMouseDown = (e) => {
     isDragging.value = true
+    emit('seek-start') // PERBAIKAN: Emit seek start saat mulai drag
     handleProgressInteraction(e.clientX)
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -67,6 +75,7 @@ const handleMouseMove = (e) => {
 
 const handleMouseUp = () => {
     isDragging.value = false
+    emit('seek-end') // PERBAIKAN: Emit seek end saat selesai drag
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
 }
@@ -74,6 +83,7 @@ const handleMouseUp = () => {
 // Touch events for mobile
 const handleTouchStart = (e) => {
     isDragging.value = true
+    emit('seek-start') // PERBAIKAN: Emit seek start saat mulai drag
     const touch = e.touches[0]
     handleProgressInteraction(touch.clientX)
 
@@ -91,6 +101,7 @@ const handleTouchMove = (e) => {
 
 const handleTouchEnd = () => {
     isDragging.value = false
+    emit('seek-end') // PERBAIKAN: Emit seek end saat selesai drag
     document.removeEventListener('touchmove', handleTouchMove)
     document.removeEventListener('touchend', handleTouchEnd)
 }
