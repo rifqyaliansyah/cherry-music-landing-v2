@@ -1,5 +1,5 @@
 <script setup>
-import { provide, ref, computed, onMounted } from 'vue'
+import { provide, ref, computed } from 'vue'
 import { useMusicStore } from '~/stores/music'
 
 const musicStore = useMusicStore()

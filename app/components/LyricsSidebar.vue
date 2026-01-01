@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X, Maximize2, Minimize2 } from 'lucide-vue-next'
 import { useMusicStore } from '~/stores/music'
 
 const props = defineProps({
@@ -15,11 +15,15 @@ const musicStore = useMusicStore()
 
 const lyricsContainerDesktop = ref(null)
 const lyricsContainerMobile = ref(null)
+const lyricsContainerFullscreen = ref(null)
 const isAutoScrollEnabled = ref(true)
 const showSyncButton = ref(false)
 const isScrollingProgrammatically = ref(false)
 const scrollDebounceTimer = ref(null)
 const lastProgrammaticScrollTime = ref(0)
+
+// Fullscreen state
+const isFullscreen = ref(false)
 
 const loadingLyrics = computed(() => musicStore.loadingDetail)
 
@@ -101,9 +105,14 @@ const scrollToActiveLine = async (immediate = false) => {
 
     await nextTick()
 
-    const container = window.innerWidth >= 1024
-        ? lyricsContainerDesktop.value
-        : lyricsContainerMobile.value
+    let container
+    if (isFullscreen.value) {
+        container = lyricsContainerFullscreen.value
+    } else {
+        container = window.innerWidth >= 1024
+            ? lyricsContainerDesktop.value
+            : lyricsContainerMobile.value
+    }
 
     if (container) {
         const targetIndex = currentLineIndex.value === -1 ? 0 : currentLineIndex.value
@@ -131,13 +140,35 @@ const scrollToActiveLine = async (immediate = false) => {
     }
 }
 
-// Handle visibility change when switching tabs
 const handleVisibilityChange = async () => {
     if (!document.hidden && props.isOpen && isAutoScrollEnabled.value && hasLyrics.value) {
         await nextTick()
         setTimeout(() => {
             scrollToActiveLine(true)
         }, 100)
+    }
+}
+
+// Fullscreen functions
+const enterFullscreen = () => {
+    isFullscreen.value = true
+
+    // Reset scroll state
+    isAutoScrollEnabled.value = true
+    showSyncButton.value = false
+
+    nextTick(() => {
+        scrollToActiveLine(true)
+    })
+}
+
+const exitFullscreen = () => {
+    isFullscreen.value = false
+}
+
+const handleKeyDown = (e) => {
+    if (e.key === 'Escape' && isFullscreen.value) {
+        exitFullscreen()
     }
 }
 
@@ -156,6 +187,11 @@ watch(() => props.isOpen, async (newVal) => {
         setTimeout(() => {
             scrollToActiveLine(true)
         }, 350)
+    }
+
+    // Exit fullscreen when sidebar is closed
+    if (!newVal && isFullscreen.value) {
+        exitFullscreen()
     }
 })
 
@@ -196,10 +232,12 @@ const showLyrics = computed(() => {
 
 onMounted(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    document.addEventListener('keydown', handleKeyDown)
 })
 
 onUnmounted(() => {
     document.removeEventListener('visibilitychange', handleVisibilityChange)
+    document.removeEventListener('keydown', handleKeyDown)
     if (scrollDebounceTimer.value) {
         clearTimeout(scrollDebounceTimer.value)
     }
@@ -207,13 +245,19 @@ onUnmounted(() => {
 </script>
 
 <template>
+    <!-- Desktop Sidebar -->
     <Transition name="slide-left">
-        <div v-if="showLyrics" class="lyrics-sidebar-desktop">
+        <div v-if="showLyrics && !isFullscreen" class="lyrics-sidebar-desktop">
             <div class="flex items-center justify-between px-4 py-5">
                 <h2 class="font-bold text-base">Now Playing</h2>
-                <button @click="$emit('close')" class="btn btn-ghost btn-xs btn-square">
-                    <X :size="18" />
-                </button>
+                <div class="flex items-center gap-2">
+                    <button @click="enterFullscreen" class="btn btn-ghost btn-xs btn-square">
+                        <Maximize2 :size="18" />
+                    </button>
+                    <button @click="$emit('close')" class="btn btn-ghost btn-xs btn-square">
+                        <X :size="18" />
+                    </button>
+                </div>
             </div>
 
             <div class="relative flex-1 overflow-hidden">
@@ -258,13 +302,15 @@ onUnmounted(() => {
         </div>
     </Transition>
 
+    <!-- Mobile Sidebar -->
     <Transition name="fade">
-        <div v-if="showLyrics" class="lg:hidden fixed inset-0 bg-black/50 z-40" @click="$emit('close')">
+        <div v-if="showLyrics && !isFullscreen" class="lg:hidden fixed inset-0 bg-black/50 z-40"
+            @click="$emit('close')">
         </div>
     </Transition>
 
     <Transition name="slide-left">
-        <div v-if="showLyrics"
+        <div v-if="showLyrics && !isFullscreen"
             class="lg:hidden fixed top-0 right-0 bottom-0 w-full sm:w-80 bg-base-200 shadow-2xl z-50 flex flex-col">
 
             <div class="flex items-center justify-between px-4 py-3">
@@ -311,6 +357,65 @@ onUnmounted(() => {
                         <button @click="syncLyrics" class="btn btn-primary btn-sm shadow-lg pointer-events-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                            Sync Lyrics
+                        </button>
+                    </div>
+                </Transition>
+            </div>
+        </div>
+    </Transition>
+
+    <!-- Fullscreen Mode -->
+    <Transition name="fade">
+        <div v-if="isFullscreen" class="fixed inset-0 bg-base-100 z-[60] flex flex-col">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4">
+                <div class="flex items-center gap-3">
+                    <img :src="currentSong.cover" alt="Cover" class="w-12 h-12 rounded-lg shadow-md object-cover" />
+                    <h2 class="font-bold text-lg">{{ currentSong.title }} - {{ currentSong.name }}</h2>
+                </div>
+                <button @click="exitFullscreen" class="btn btn-ghost btn-sm btn-square">
+                    <Minimize2 :size="20" />
+                </button>
+            </div>
+
+            <!-- Lyrics Content -->
+            <div class="relative flex-1 overflow-hidden">
+                <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
+                    <span class="loading loading-spinner loading-lg"></span>
+                </div>
+
+                <div v-else-if="!hasLyrics" class="h-full flex flex-col items-center justify-center px-4 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 opacity-30 mb-4" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p class="text-lg opacity-60">Lyrics not available for this song</p>
+                </div>
+
+                <div v-else ref="lyricsContainerFullscreen" @scroll="handleUserScroll"
+                    class="h-full overflow-y-auto px-6 py-4 lyrics-container">
+                    <div class="max-w-4xl mx-auto py-0">
+                        <div v-for="(line, index) in lyricsData" :key="index" :data-index="index"
+                            class="lyric-line-fullscreen cursor-pointer" :class="getLineState(index)"
+                            @click="handleLyricClick(line.time)">
+                            {{ line.text || '♫' }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sync Button -->
+                <Transition name="fade-slide">
+                    <div v-if="showSyncButton && hasLyrics"
+                        class="absolute bottom-8 left-0 right-0 flex justify-center pointer-events-none">
+                        <button @click="syncLyrics" class="btn btn-primary btn-md shadow-lg pointer-events-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" class="w-5 h-5">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                             </svg>
@@ -386,6 +491,52 @@ onUnmounted(() => {
 }
 
 .lyric-line.past {
+    opacity: 0.25;
+    filter: blur(0.5px);
+    transform: scale(0.95);
+}
+
+/* Fullscreen specific styles */
+.lyric-line-fullscreen {
+    text-align: center;
+    padding: 1.25rem 0;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+    line-height: 1.5;
+    font-size: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .lyric-line-fullscreen {
+        font-size: 2rem;
+        padding: 1.5rem 0;
+    }
+}
+
+.lyric-line-fullscreen:hover {
+    opacity: 1 !important;
+    transform: scale(1.02);
+}
+
+.lyric-line-fullscreen.future {
+    opacity: 0.3;
+    filter: blur(0.5px);
+    transform: scale(0.95);
+}
+
+.lyric-line-fullscreen.active {
+    font-weight: 700;
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1.08);
+    text-shadow:
+        0 0 30px oklch(var(--p) / 0.6),
+        0 0 50px oklch(var(--p) / 0.4),
+        0 0 80px oklch(var(--p) / 0.2);
+    color: oklch(var(--p));
+}
+
+.lyric-line-fullscreen.past {
     opacity: 0.25;
     filter: blur(0.5px);
     transform: scale(0.95);
