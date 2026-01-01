@@ -375,8 +375,11 @@ onUnmounted(() => {
             <!-- Header -->
             <div class="flex items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-3">
-                    <img :src="currentSong.cover" alt="Cover" class="w-12 h-12 rounded-lg shadow-md object-cover" />
-                    <h2 class="font-bold text-lg">{{ currentSong.title }} - {{ currentSong.name }}</h2>
+                    <img :src="currentSong.cover" alt="Cover" class="w-14 h-14 rounded-lg shadow-md object-cover" />
+                    <div>
+                        <h2 class="font-bold text-lg">{{ currentSong.title }}</h2>
+                        <p class="text-sm opacity-60">{{ currentSong.name }}</p>
+                    </div>
                 </div>
                 <button @click="exitFullscreen" class="btn btn-ghost btn-sm btn-square">
                     <Minimize2 :size="20" />
