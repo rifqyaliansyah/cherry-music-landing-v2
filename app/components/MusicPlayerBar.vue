@@ -133,7 +133,7 @@ const formatTime = (seconds) => {
                             class="w-16 h-16 md:w-14 md:h-14 rounded object-cover shadow-lg" />
                         <div class="overflow-hidden hidden md:block">
                             <div class="font-semibold text-sm truncate">{{ currentSong.title }}</div>
-                            <div class="text-xs opacity-60 truncate">{{ currentSong.name }}</div>
+                            <div class="text-xs opacity-60 truncate">{{ currentSong.artist }}</div>
                         </div>
                     </div>
 

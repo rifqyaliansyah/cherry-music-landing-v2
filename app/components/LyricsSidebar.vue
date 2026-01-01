@@ -323,7 +323,7 @@ onUnmounted(() => {
             <div class="p-4 flex flex-col items-center">
                 <img :src="currentSong.cover" alt="Cover" class="w-32 h-32 rounded-lg shadow-lg object-cover mb-2" />
                 <h3 class="text-base font-bold text-center">{{ currentSong.title }}</h3>
-                <p class="text-xs opacity-60">{{ currentSong.name }}</p>
+                <p class="text-xs opacity-60">{{ currentSong.artist }}</p>
             </div>
 
             <div class="relative flex-1 overflow-hidden">
@@ -378,7 +378,7 @@ onUnmounted(() => {
                     <img :src="currentSong.cover" alt="Cover" class="w-14 h-14 rounded-lg shadow-md object-cover" />
                     <div>
                         <h2 class="font-bold text-lg">{{ currentSong.title }}</h2>
-                        <p class="text-sm opacity-60">{{ currentSong.name }}</p>
+                        <p class="text-sm opacity-60">{{ currentSong.artist }}</p>
                     </div>
                 </div>
                 <button @click="exitFullscreen" class="btn btn-ghost btn-sm btn-square">

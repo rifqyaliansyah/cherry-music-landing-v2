@@ -42,7 +42,7 @@ export const useMusicStore = defineStore('music', {
                     this.songs = response.data.map(song => ({
                         id: song.id,
                         title: song.title,
-                        name: song.artist,
+                        artist: song.artist,
                         cover: song.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
                         duration: song.duration,
                         audio_url: song.audio_url,
@@ -76,7 +76,7 @@ export const useMusicStore = defineStore('music', {
                     const songDetail = {
                         id: response.data.id,
                         title: response.data.title,
-                        name: response.data.artist,
+                        artist: response.data.artist,
                         cover: response.data.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
                         duration: response.data.duration,
                         audio_url: response.data.audio_url,
@@ -117,7 +117,7 @@ export const useMusicStore = defineStore('music', {
                     currentSong: {
                         id: song.id,
                         title: song.title,
-                        name: song.name,
+                        artist: song.artist,
                         cover: song.cover,
                         duration: song.duration,
                         audio_url: song.audio_url,
