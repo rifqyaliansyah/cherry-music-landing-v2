@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed, nextTick } from 'vue'
+import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { X } from 'lucide-vue-next'
 import { useMusicStore } from '~/stores/music'
 
@@ -29,7 +29,6 @@ const lyricsData = computed(() => {
     const songDetail = musicStore.getSongDetail(props.currentSong.id)
     if (!songDetail || !songDetail.lyrics) return []
 
-    // Convert string time to number
     return songDetail.lyrics.map(lyric => ({
         time: parseFloat(lyric.time),
         text: lyric.text
@@ -132,6 +131,16 @@ const scrollToActiveLine = async (immediate = false) => {
     }
 }
 
+// Handle visibility change when switching tabs
+const handleVisibilityChange = async () => {
+    if (!document.hidden && props.isOpen && isAutoScrollEnabled.value && hasLyrics.value) {
+        await nextTick()
+        setTimeout(() => {
+            scrollToActiveLine(true)
+        }, 100)
+    }
+}
+
 watch(currentLineIndex, () => {
     if (isAutoScrollEnabled.value) {
         scrollToActiveLine()
@@ -184,6 +193,17 @@ const handleLyricClick = async (lyricTime) => {
 const showLyrics = computed(() => {
     return props.isOpen && props.currentSong
 })
+
+onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    if (scrollDebounceTimer.value) {
+        clearTimeout(scrollDebounceTimer.value)
+    }
+})
 </script>
 
 <template>
@@ -195,12 +215,6 @@ const showLyrics = computed(() => {
                     <X :size="18" />
                 </button>
             </div>
-
-            <!-- <div class="p-4 flex flex-col items-center">
-                <img :src="currentSong.cover" alt="Cover" class="w-32 h-32 rounded-lg shadow-lg object-cover mb-2" />
-                <h3 class="text-base font-bold text-center">{{ currentSong.title }}</h3>
-                <p class="text-xs opacity-60">{{ currentSong.name }}</p>
-            </div> -->
 
             <div class="relative flex-1 overflow-hidden">
                 <div v-if="loadingLyrics" class="h-full flex items-center justify-center">

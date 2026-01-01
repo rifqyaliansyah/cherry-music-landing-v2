@@ -9,7 +9,8 @@ const props = defineProps({
     duration: Number,
     shuffleEnabled: Boolean,
     repeatMode: String,
-    volume: Number
+    volume: Number,
+    lyricsOpen: Boolean
 })
 
 const emit = defineEmits([
@@ -220,7 +221,8 @@ const formatTime = (seconds) => {
                     </div>
 
                     <div class="flex flex-col lg:flex-row items-center gap-2 lg:gap-2 w-[30%] justify-end">
-                        <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-xs lg:btn-sm">
+                        <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-xs lg:btn-sm"
+                            :class="{ 'btn-primary': lyricsOpen }">
                             <ListMusic :size="14" class="lg:hidden" />
                             <ListMusic :size="16" class="hidden lg:block" />
                         </button>

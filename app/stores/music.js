@@ -1,7 +1,7 @@
-// app/stores/music.js
 import { defineStore } from 'pinia'
 
 const STORAGE_KEY = 'music_player_state'
+const PLAYBACK_SETTINGS_KEY = 'playback_settings'
 
 export const useMusicStore = defineStore('music', {
     state: () => ({
@@ -105,7 +105,7 @@ export const useMusicStore = defineStore('music', {
             }
         },
 
-        // LocalStorage actions
+        // LocalStorage actions for player state
         savePlayerState(song, index) {
             if (!song) {
                 this.clearPlayerState()
@@ -187,6 +187,32 @@ export const useMusicStore = defineStore('music', {
             }
 
             return true
+        },
+
+        // LocalStorage actions for playback settings
+        savePlaybackSettings(shuffleEnabled, repeatMode) {
+            try {
+                const settings = {
+                    shuffleEnabled,
+                    repeatMode
+                }
+                localStorage.setItem(PLAYBACK_SETTINGS_KEY, JSON.stringify(settings))
+            } catch (err) {
+                console.error('Error saving playback settings:', err)
+            }
+        },
+
+        loadPlaybackSettings() {
+            try {
+                const saved = localStorage.getItem(PLAYBACK_SETTINGS_KEY)
+                if (!saved) return null
+
+                const settings = JSON.parse(saved)
+                return settings
+            } catch (err) {
+                console.error('Error loading playback settings:', err)
+                return null
+            }
         }
     }
 })

@@ -15,10 +15,9 @@ const currentTime = ref(0)
 const duration = ref(0)
 const isLoadingAudio = ref(false)
 
-// New states for shuffle, repeat, and volume
 const shuffleEnabled = ref(false)
-const repeatMode = ref('off') // 'off', 'all', 'one'
-const volume = ref(1) // 0 - 1
+const repeatMode = ref('off')
+const volume = ref(1)
 const shuffledIndices = ref([])
 
 const isUserSeeking = ref(false)
@@ -41,7 +40,6 @@ const skeletonCount = computed(() => {
     return 10
 })
 
-// Shuffle playlist logic
 const shufflePlaylist = () => {
     if (songs.value.length === 0) return
 
@@ -61,24 +59,23 @@ const shufflePlaylist = () => {
     }
 }
 
-// Toggle shuffle
 const toggleShuffle = () => {
     if (repeatMode.value !== 'off') return
 
     shuffleEnabled.value = !shuffleEnabled.value
     shufflePlaylist()
+    musicStore.savePlaybackSettings(shuffleEnabled.value, repeatMode.value)
 }
 
-// Toggle repeat mode
 const toggleRepeat = () => {
     if (shuffleEnabled.value) return
 
     const modes = ['off', 'all', 'one']
     const currentModeIndex = modes.indexOf(repeatMode.value)
     repeatMode.value = modes[(currentModeIndex + 1) % modes.length]
+    musicStore.savePlaybackSettings(shuffleEnabled.value, repeatMode.value)
 }
 
-// Handle volume change
 const handleVolumeChange = (newVolume) => {
     volume.value = newVolume
     if (audioRef.value) {
@@ -86,7 +83,6 @@ const handleVolumeChange = (newVolume) => {
     }
 }
 
-// Restore player state dari localStorage
 const restorePlayerState = async () => {
     const savedState = musicStore.loadPlayerState()
 
@@ -127,8 +123,21 @@ const restorePlayerState = async () => {
     }
 }
 
+const restorePlaybackSettings = () => {
+    const settings = musicStore.loadPlaybackSettings()
+    if (settings) {
+        shuffleEnabled.value = settings.shuffleEnabled || false
+        repeatMode.value = settings.repeatMode || 'off'
+
+        if (shuffleEnabled.value) {
+            shufflePlaylist()
+        }
+    }
+}
+
 onMounted(async () => {
     await musicStore.fetchSongs()
+    restorePlaybackSettings()
     await restorePlayerState()
     setupAudioEvents()
 })
@@ -201,7 +210,6 @@ const setupAudioEvents = () => {
     })
 }
 
-// Handle when song ends (with repeat logic)
 const handleSongEnd = () => {
     if (repeatMode.value === 'one') {
         audioRef.value.currentTime = 0
@@ -277,7 +285,6 @@ watch(isPlaying, async (playing) => {
     }
 })
 
-// Watch songs change to update shuffle
 watch(songs, () => {
     if (shuffleEnabled.value) {
         shufflePlaylist()
@@ -550,9 +557,10 @@ const toggleLyrics = () => {
 
         <MusicPlayerBar :current-song="currentSong" :is-playing="isPlaying" :current-time="currentTime"
             :duration="duration" :shuffle-enabled="shuffleEnabled" :repeat-mode="repeatMode" :volume="volume"
-            @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
-            @open-lyrics="toggleLyrics" @toggle-shuffle="toggleShuffle" @toggle-repeat="toggleRepeat"
-            @volume-change="handleVolumeChange" @seek-start="handleSeekStart" @seek-end="handleSeekEnd" />
+            :lyrics-open="lyricsState?.lyricsOpen.value" @toggle-play="togglePlay" @next="nextSong"
+            @previous="previousSong" @seek="seekTo" @open-lyrics="toggleLyrics" @toggle-shuffle="toggleShuffle"
+            @toggle-repeat="toggleRepeat" @volume-change="handleVolumeChange" @seek-start="handleSeekStart"
+            @seek-end="handleSeekEnd" />
     </div>
 </template>
 
