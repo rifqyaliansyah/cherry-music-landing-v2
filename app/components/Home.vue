@@ -15,6 +15,12 @@ const currentTime = ref(0)
 const duration = ref(0)
 const isLoadingAudio = ref(false)
 
+// New states for shuffle, repeat, and volume
+const shuffleEnabled = ref(false)
+const repeatMode = ref('off') // 'off', 'all', 'one'
+const volume = ref(1) // 0 - 1
+const shuffledIndices = ref([])
+
 const audioRef = ref(null)
 
 const lyricsState = inject('lyricsState')
@@ -33,6 +39,49 @@ const skeletonCount = computed(() => {
     return 10
 })
 
+// Shuffle playlist logic
+const shufflePlaylist = () => {
+    if (songs.value.length === 0) return
+
+    if (shuffleEnabled.value) {
+        // Create shuffled array of indices
+        shuffledIndices.value = [...Array(songs.value.length).keys()]
+            .sort(() => Math.random() - 0.5)
+
+        // Make sure current song stays as first in shuffle
+        if (currentIndex.value !== -1) {
+            const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
+            if (currentPos > 0) {
+                [shuffledIndices.value[0], shuffledIndices.value[currentPos]] =
+                    [shuffledIndices.value[currentPos], shuffledIndices.value[0]]
+            }
+        }
+    } else {
+        shuffledIndices.value = []
+    }
+}
+
+// Toggle shuffle
+const toggleShuffle = () => {
+    shuffleEnabled.value = !shuffleEnabled.value
+    shufflePlaylist()
+}
+
+// Toggle repeat mode
+const toggleRepeat = () => {
+    const modes = ['off', 'all', 'one']
+    const currentModeIndex = modes.indexOf(repeatMode.value)
+    repeatMode.value = modes[(currentModeIndex + 1) % modes.length]
+}
+
+// Handle volume change
+const handleVolumeChange = (newVolume) => {
+    volume.value = newVolume
+    if (audioRef.value) {
+        audioRef.value.volume = newVolume
+    }
+}
+
 // Restore player state dari localStorage
 const restorePlayerState = async () => {
     const savedState = musicStore.loadPlayerState()
@@ -41,14 +90,12 @@ const restorePlayerState = async () => {
         return
     }
 
-    // Validate if song still exists
     const isValid = await musicStore.validateSavedSong(savedState.currentSong.id)
 
     if (!isValid) {
         return
     }
 
-    // Get fresh data from songs list (updated dari API)
     const freshSong = songs.value.find(s => s.id === savedState.currentSong.id)
 
     if (!freshSong) {
@@ -56,28 +103,24 @@ const restorePlayerState = async () => {
         return
     }
 
-    // Fetch detail (termasuk lyrics) dari API
     const songDetail = await musicStore.fetchSongDetail(freshSong.id)
     const songToRestore = songDetail || freshSong
 
-    // Restore dengan data yang fresh
     currentSong.value = songToRestore
     currentIndex.value = songs.value.findIndex(s => s.id === freshSong.id)
 
-    // Sync with layout
     if (lyricsState) {
         lyricsState.setCurrentSong(songToRestore)
     }
 
-    // Load audio (tapi jangan auto play)
     if (audioRef.value) {
         audioRef.value.src = songToRestore.audio_url
         audioRef.value.load()
         duration.value = songToRestore.duration || 0
+        audioRef.value.volume = volume.value
     }
 }
 
-// Fetch songs dan restore state
 onMounted(async () => {
     await musicStore.fetchSongs()
     await restorePlayerState()
@@ -121,7 +164,7 @@ const setupAudioEvents = () => {
     audio.addEventListener('timeupdate', updateTime)
 
     audio.addEventListener('ended', () => {
-        nextSong()
+        handleSongEnd()
     })
 
     audio.addEventListener('play', () => {
@@ -139,12 +182,39 @@ const setupAudioEvents = () => {
     })
 }
 
+// Handle when song ends (with repeat logic)
+const handleSongEnd = () => {
+    if (repeatMode.value === 'one') {
+        // Repeat current song
+        audioRef.value.currentTime = 0
+        audioRef.value.play()
+    } else if (repeatMode.value === 'all') {
+        // Go to next song (will loop back to first)
+        nextSong()
+    } else {
+        // Stop at last song
+        if (shuffleEnabled.value) {
+            const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
+            if (currentPos < shuffledIndices.value.length - 1) {
+                nextSong()
+            } else {
+                isPlaying.value = false
+            }
+        } else {
+            if (currentIndex.value < songs.value.length - 1) {
+                nextSong()
+            } else {
+                isPlaying.value = false
+            }
+        }
+    }
+}
+
 watch(currentSong, (newSong) => {
     if (lyricsState) {
         lyricsState.setCurrentSong(newSong)
     }
 
-    // Save to localStorage whenever song changes
     if (newSong) {
         musicStore.savePlayerState(newSong, currentIndex.value)
     } else {
@@ -191,6 +261,13 @@ watch(isPlaying, async (playing) => {
     }
 })
 
+// Watch songs change to update shuffle
+watch(songs, () => {
+    if (shuffleEnabled.value) {
+        shufflePlaylist()
+    }
+})
+
 onUnmounted(() => {
     if (audioRef.value) {
         audioRef.value.pause()
@@ -208,6 +285,7 @@ const loadAndPlayAudio = async (song) => {
 
     audioRef.value.src = song.audio_url
     audioRef.value.load()
+    audioRef.value.volume = volume.value
 
     duration.value = song.duration || 0
 
@@ -237,13 +315,11 @@ const loadAndPlayAudio = async (song) => {
 }
 
 const playSong = async (song, index) => {
-    // Kalau lagu yang sama, toggle play/pause
     if (currentSong.value?.id === song.id) {
         togglePlay()
         return
     }
 
-    // Kalau lagu berbeda, fetch detail dan play
     const songDetail = await musicStore.fetchSongDetail(song.id)
 
     let songToPlay = songDetail || song
@@ -271,25 +347,45 @@ const togglePlay = () => {
 const nextSong = async () => {
     if (songs.value.length === 0) return
 
-    if (currentIndex.value < songs.value.length - 1) {
-        currentIndex.value++
-        await playSong(songs.value[currentIndex.value], currentIndex.value)
+    let nextIndex
+
+    if (shuffleEnabled.value && shuffledIndices.value.length > 0) {
+        // Shuffle mode
+        const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
+        const nextPos = (currentPos + 1) % shuffledIndices.value.length
+        nextIndex = shuffledIndices.value[nextPos]
     } else {
-        currentIndex.value = 0
-        await playSong(songs.value[0], 0)
+        // Normal mode
+        if (currentIndex.value < songs.value.length - 1) {
+            nextIndex = currentIndex.value + 1
+        } else {
+            nextIndex = 0
+        }
     }
+
+    await playSong(songs.value[nextIndex], nextIndex)
 }
 
 const previousSong = async () => {
     if (songs.value.length === 0) return
 
-    if (currentIndex.value > 0) {
-        currentIndex.value--
-        await playSong(songs.value[currentIndex.value], currentIndex.value)
+    let prevIndex
+
+    if (shuffleEnabled.value && shuffledIndices.value.length > 0) {
+        // Shuffle mode
+        const currentPos = shuffledIndices.value.indexOf(currentIndex.value)
+        const prevPos = currentPos - 1 < 0 ? shuffledIndices.value.length - 1 : currentPos - 1
+        prevIndex = shuffledIndices.value[prevPos]
     } else {
-        currentIndex.value = songs.value.length - 1
-        await playSong(songs.value[songs.value.length - 1], songs.value.length - 1)
+        // Normal mode
+        if (currentIndex.value > 0) {
+            prevIndex = currentIndex.value - 1
+        } else {
+            prevIndex = songs.value.length - 1
+        }
     }
+
+    await playSong(songs.value[prevIndex], prevIndex)
 }
 
 const seekTo = (time) => {
@@ -312,10 +408,8 @@ const toggleLyrics = () => {
 
 <template>
     <div class="pb-32">
-        <!-- Audio element (hidden) -->
         <audio ref="audioRef" preload="auto" style="display: none;"></audio>
 
-        <!-- Loading overlay untuk audio -->
         <div v-if="isLoadingAudio"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 pointer-events-none">
             <div class="loading loading-spinner loading-lg"></div>
@@ -326,7 +420,6 @@ const toggleLyrics = () => {
                 <h1 class="text-xs font-bold opacity-60">Created by you</h1>
                 <h1 class="text-3xl font-bold mb-6">All Songs</h1>
 
-                <!-- Loading State with Skeleton -->
                 <div v-if="loading" class="grid gap-4 transition-all duration-300" :class="gridClass">
                     <div v-for="i in skeletonCount" :key="i" class="card bg-base-100 shadow-md">
                         <figure class="px-4 pt-4">
@@ -339,7 +432,6 @@ const toggleLyrics = () => {
                     </div>
                 </div>
 
-                <!-- Error State -->
                 <div v-else-if="error" class="alert alert-error">
                     <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
                         viewBox="0 0 24 24">
@@ -349,7 +441,6 @@ const toggleLyrics = () => {
                     <span>{{ error }}</span>
                 </div>
 
-                <!-- Empty State -->
                 <div v-else-if="!songs.length" class="flex flex-col items-center justify-center py-20">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 opacity-30 mb-4" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor">
@@ -359,7 +450,6 @@ const toggleLyrics = () => {
                     <p class="text-lg opacity-60">Belum ada lagu tersedia</p>
                 </div>
 
-                <!-- Songs Grid -->
                 <div v-else class="grid gap-4 transition-all duration-300" :class="gridClass">
                     <div v-for="(song, index) in songs" :key="song.id" @click="playSong(song, index)"
                         class="card bg-base-100 shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer group">
@@ -416,8 +506,10 @@ const toggleLyrics = () => {
         </div>
 
         <MusicPlayerBar :current-song="currentSong" :is-playing="isPlaying" :current-time="currentTime"
-            :duration="duration" @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
-            @open-lyrics="toggleLyrics" />
+            :duration="duration" :shuffle-enabled="shuffleEnabled" :repeat-mode="repeatMode" :volume="volume"
+            @toggle-play="togglePlay" @next="nextSong" @previous="previousSong" @seek="seekTo"
+            @open-lyrics="toggleLyrics" @toggle-shuffle="toggleShuffle" @toggle-repeat="toggleRepeat"
+            @volume-change="handleVolumeChange" />
     </div>
 </template>
 

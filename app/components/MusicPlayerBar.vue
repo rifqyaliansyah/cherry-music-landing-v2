@@ -1,15 +1,27 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { ListMusic } from 'lucide-vue-next'
+import { ListMusic, Volume2, VolumeX } from 'lucide-vue-next'
 
 const props = defineProps({
     currentSong: Object,
     isPlaying: Boolean,
     currentTime: Number,
-    duration: Number
+    duration: Number,
+    shuffleEnabled: Boolean,
+    repeatMode: String,
+    volume: Number
 })
 
-const emit = defineEmits(['toggle-play', 'next', 'previous', 'seek', 'open-lyrics'])
+const emit = defineEmits([
+    'toggle-play',
+    'next',
+    'previous',
+    'seek',
+    'open-lyrics',
+    'toggle-shuffle',
+    'toggle-repeat',
+    'volume-change'
+])
 
 const progressBar = ref(null)
 const progress = ref(0)
@@ -59,6 +71,14 @@ const handleMouseUp = () => {
     document.removeEventListener('mouseup', handleMouseUp)
 }
 
+const toggleMute = () => {
+    if (props.volume > 0) {
+        emit('volume-change', 0)
+    } else {
+        emit('volume-change', 1)
+    }
+}
+
 const formatTime = (seconds) => {
     const roundedSeconds = Math.floor(seconds)
     const mins = Math.floor(roundedSeconds / 60)
@@ -86,9 +106,10 @@ const formatTime = (seconds) => {
                     <!-- Play Controls - Center -->
                     <div class="flex-1 flex flex-col items-center gap-2 max-w-[500px] -ml-4 md:ml-0">
                         <div class="flex items-center gap-2">
-                            <!-- Repeat Button -->
-                            <button class="btn btn-square btn-neutral btn-sm">
-                                <svg width="16" height="16" viewBox="0 0 48 48" fill="none"
+                            <!-- Shuffle Button -->
+                            <button @click="$emit('toggle-shuffle')" class="btn btn-square btn-neutral btn-xs"
+                                :class="{ 'btn-primary': shuffleEnabled }">
+                                <svg width="12" height="12" viewBox="0 0 48 48" fill="none"
                                     xmlns="http://www.w3.org/2000/svg">
                                     <path d="M40 33L44 37L40 41" stroke="currentColor" stroke-width="4"
                                         stroke-linecap="round" stroke-linejoin="round" />
@@ -131,26 +152,31 @@ const formatTime = (seconds) => {
                                 </svg>
                             </button>
 
-                            <!-- Shuffle Button -->
-                            <button class="btn btn-square btn-neutral btn-sm">
-                                <svg width="16" height="16" viewBox="0 0 48 48" fill="none"
+                            <!-- Repeat Button -->
+                            <button @click="$emit('toggle-repeat')" class="btn btn-square btn-neutral btn-xs relative"
+                                :class="{ 'btn-primary': repeatMode !== 'off' }">
+                                <svg width="12" height="12" viewBox="0 0 48 48" fill="none"
                                     xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M4 25C4 18.3502 9.39624 13 16 13H44" stroke="currentColor" stroke-width="4"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                    <path d="M38 7L44 13L38 19" stroke="currentColor" stroke-width="4"
-                                        stroke-linecap="round" stroke-linejoin="round" />
                                     <path d="M44 23C44 29.6498 38.6038 35 32 35H4" stroke="currentColor"
                                         stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
                                     <path d="M10 41L4 35L10 29" stroke="currentColor" stroke-width="4"
                                         stroke-linecap="round" stroke-linejoin="round" />
+                                    <path d="M4 25C4 18.3502 9.39624 13 16 13H44" stroke="currentColor" stroke-width="4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                    <path d="M38 7L44 13L38 19" stroke="currentColor" stroke-width="4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
+                                <!-- Indicator for Repeat One -->
+                                <span v-if="repeatMode === 'one'"
+                                    class="absolute -top-1 -right-1 bg-primary text-primary-content rounded-full w-3 h-3 flex items-center justify-center text-[8px] font-bold">
+                                    1
+                                </span>
                             </button>
                         </div>
 
                         <!-- Progress Bar - DRAGGABLE -->
                         <div class="w-full flex items-center gap-2">
-                            <span class="text-xs opacity-50 text-right pt-1">{{ formatTime(currentTime)
-                                }}</span>
+                            <span class="text-xs opacity-50 text-right pt-1">{{ formatTime(currentTime) }}</span>
                             <div class="relative cursor-pointer select-none flex-1" @click="handleProgressClick"
                                 @mousedown="handleMouseDown" ref="progressBar">
                                 <progress class="progress pointer-events-none" :value="progress" max="100"></progress>
@@ -164,17 +190,11 @@ const formatTime = (seconds) => {
                         <button @click="$emit('open-lyrics')" class="btn btn-square btn-neutral btn-sm">
                             <ListMusic :size="16" />
                         </button>
-                        <button class="btn btn-square btn-neutral btn-sm">
-                            <svg width="16" height="16" viewBox="0 0 48 48" fill="none"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <path
-                                    d="M24 6V42C17 42 11.7985 32.8391 11.7985 32.8391H6C4.89543 32.8391 4 31.9437 4 30.8391V17.0108C4 15.9062 4.89543 15.0108 6 15.0108H11.7985C11.7985 15.0108 17 6 24 6Z"
-                                    fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round" />
-                                <path
-                                    d="M32 15L32 15C32.6232 15.5565 33.1881 16.1797 33.6841 16.8588C35.1387 18.8504 36 21.3223 36 24C36 26.6545 35.1535 29.1067 33.7218 31.0893C33.2168 31.7885 32.6391 32.4293 32 33"
-                                    stroke="currentColor" stroke-width="4" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
+
+                        <!-- Mute/Unmute Toggle -->
+                        <button @click="toggleMute" class="btn btn-square btn-neutral btn-sm">
+                            <Volume2 v-if="volume > 0" :size="16" />
+                            <VolumeX v-else :size="16" />
                         </button>
                     </div>
                 </div>
