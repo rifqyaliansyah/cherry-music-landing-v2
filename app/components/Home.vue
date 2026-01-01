@@ -441,7 +441,7 @@ const toggleLyrics = () => {
 
         <div class="container mx-auto max-w-6xl px-4">
             <div class="py-6 md:py-8">
-                <h1 class="text-xs font-bold opacity-60">Created by you</h1>
+                <h1 class="text-xs font-bold opacity-60">Created for you</h1>
                 <h1 class="text-3xl font-bold mb-6">All Songs</h1>
 
                 <div v-if="loading" class="grid gap-4 transition-all duration-300" :class="gridClass">
@@ -471,7 +471,7 @@ const toggleLyrics = () => {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                     </svg>
-                    <p class="text-lg opacity-60">Belum ada lagu tersedia</p>
+                    <p class="text-lg opacity-60">No songs found</p>
                 </div>
 
                 <div v-else class="grid gap-4 transition-all duration-300" :class="gridClass">

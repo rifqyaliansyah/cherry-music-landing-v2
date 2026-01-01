@@ -196,11 +196,11 @@ const showLyrics = computed(() => {
                 </button>
             </div>
 
-            <div class="p-4 flex flex-col items-center">
+            <!-- <div class="p-4 flex flex-col items-center">
                 <img :src="currentSong.cover" alt="Cover" class="w-32 h-32 rounded-lg shadow-lg object-cover mb-2" />
                 <h3 class="text-base font-bold text-center">{{ currentSong.title }}</h3>
                 <p class="text-xs opacity-60">{{ currentSong.name }}</p>
-            </div>
+            </div> -->
 
             <div class="relative flex-1 overflow-hidden">
                 <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
