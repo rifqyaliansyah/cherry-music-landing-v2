@@ -622,7 +622,11 @@ const submitDeleteSong = async () => {
                         </label>
 
                         <textarea v-model="addForm.lyrics" class="textarea textarea-bordered h-24 w-full"
-                            placeholder='[{"time": "8.05", "text": "Sejuta bayangan dirimu"}]'></textarea>
+                            placeholder='[
+    { "time": "1.80", "text": "Dalam benakku lama tertanam" },
+    { "time": "8.05", "text": "Sejuta bayangan dirimu" },
+    { "time": "14.54", "text": "Redup terasa cahaya hati" }
+]'></textarea>
 
                         <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
                     </div>
@@ -640,6 +644,9 @@ const submitDeleteSong = async () => {
                         {{ submitting ? 'Adding...' : 'Add Music' }}
                     </button>
                 </div>
+                <p class="text-xs text-base-content/60 text-right mt-2">
+                    Note: Adding music may take a few moments.
+                </p>
             </div>
         </dialog>
 
@@ -763,7 +770,11 @@ const submitDeleteSong = async () => {
                                 <span class="label-text font-semibold mb-2">Lyrics (Optional)</span>
                             </label>
                             <textarea v-model="editForm.lyrics" class="textarea textarea-bordered h-24 w-full"
-                                placeholder='[{"time": "8.05", "text": "Sejuta bayangan dirimu"}]'></textarea>
+                                placeholder='[
+    { "time": "1.80", "text": "Dalam benakku lama tertanam" },
+    { "time": "8.05", "text": "Sejuta bayangan dirimu" },
+    { "time": "14.54", "text": "Redup terasa cahaya hati" }
+]'></textarea>
 
                             <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
                         </div>
@@ -782,6 +793,9 @@ const submitDeleteSong = async () => {
                         {{ submitting ? 'Saving...' : 'Save Changes' }}
                     </button>
                 </div>
+                <p class="text-xs text-base-content/60 text-right mt-2">
+                    Note: Updating audio source may take a few moments.
+                </p>
             </div>
         </dialog>
 
