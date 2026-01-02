@@ -22,22 +22,35 @@ const isScrollingProgrammatically = ref(false)
 const scrollDebounceTimer = ref(null)
 const lastProgrammaticScrollTime = ref(0)
 
-// Fullscreen state
 const isFullscreen = ref(false)
 
-const loadingLyrics = computed(() => musicStore.loadingDetail)
+const lyricsData = ref([])
+const loadingLyrics = ref(false)
 
-const lyricsData = computed(() => {
-    if (!props.currentSong?.id) return []
+watch(() => props.currentSong?.id, async (newId) => {
+    if (!newId) {
+        lyricsData.value = []
+        return
+    }
 
-    const songDetail = musicStore.getSongDetail(props.currentSong.id)
-    if (!songDetail || !songDetail.lyrics) return []
-
-    return songDetail.lyrics.map(lyric => ({
-        time: parseFloat(lyric.time),
-        text: lyric.text
-    }))
-})
+    loadingLyrics.value = true
+    try {
+        const songDetail = await musicStore.fetchSongDetail(newId)
+        if (songDetail && songDetail.lyrics) {
+            lyricsData.value = songDetail.lyrics.map(lyric => ({
+                time: parseFloat(lyric.time),
+                text: lyric.text
+            }))
+        } else {
+            lyricsData.value = []
+        }
+    } catch (err) {
+        console.error('Error loading lyrics:', err)
+        lyricsData.value = []
+    } finally {
+        loadingLyrics.value = false
+    }
+}, { immediate: true })
 
 const hasLyrics = computed(() => {
     return lyricsData.value && lyricsData.value.length > 0
@@ -152,8 +165,6 @@ const handleVisibilityChange = async () => {
 // Fullscreen functions
 const enterFullscreen = () => {
     isFullscreen.value = true
-
-    // Reset scroll state
     isAutoScrollEnabled.value = true
     showSyncButton.value = false
 
@@ -189,7 +200,6 @@ watch(() => props.isOpen, async (newVal) => {
         }, 350)
     }
 
-    // Exit fullscreen when sidebar is closed
     if (!newVal && isFullscreen.value) {
         exitFullscreen()
     }
@@ -372,7 +382,6 @@ onUnmounted(() => {
     <Transition name="fade">
         <div v-if="isFullscreen" class="fixed inset-0 bg-base-100 z-[60] flex flex-col">
 
-            <!-- Header -->
             <div class="flex items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-3">
                     <img :src="currentSong.cover" alt="Cover" class="w-14 h-14 rounded-lg shadow-md object-cover" />
@@ -386,7 +395,6 @@ onUnmounted(() => {
                 </button>
             </div>
 
-            <!-- Lyrics Content -->
             <div class="relative flex-1 overflow-hidden">
                 <div v-if="loadingLyrics" class="h-full flex items-center justify-center">
                     <span class="loading loading-spinner loading-lg"></span>
@@ -412,7 +420,6 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Sync Button -->
                 <Transition name="fade-slide">
                     <div v-if="showSyncButton && hasLyrics"
                         class="absolute bottom-8 left-0 right-0 flex justify-center pointer-events-none">
@@ -499,7 +506,6 @@ onUnmounted(() => {
     transform: scale(0.95);
 }
 
-/* Fullscreen specific styles */
 .lyric-line-fullscreen {
     text-align: center;
     padding: 1.25rem 0;

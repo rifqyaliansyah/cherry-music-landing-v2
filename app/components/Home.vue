@@ -1,14 +1,30 @@
 <script setup>
-import { inject, computed } from 'vue'
+import { inject, computed, ref, onMounted } from 'vue'
 import { useMusicStore } from '~/stores/music'
 
 const musicStore = useMusicStore()
 
-const songs = computed(() => musicStore.songs)
-const loading = computed(() => musicStore.loading)
-const error = computed(() => musicStore.error)
+const songs = ref([])
+const loading = ref(false)
+const error = ref(null)
 
-// Inject states from layout
+const loadSongs = async () => {
+    loading.value = true
+    error.value = null
+    try {
+        songs.value = await musicStore.fetchSongs()
+    } catch (err) {
+        error.value = err.message
+        songs.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+onMounted(() => {
+    loadSongs()
+})
+
 const lyricsState = inject('lyricsState')
 const playerState = inject('playerState')
 

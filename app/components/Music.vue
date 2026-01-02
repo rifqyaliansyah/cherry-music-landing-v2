@@ -1,17 +1,98 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useMusicStore } from '~/stores/music'
+import { ref, onMounted } from 'vue'
 import { Clock3, X, Upload, Link } from 'lucide-vue-next'
 
-const musicStore = useMusicStore()
+const config = useRuntimeConfig()
+const apiBaseUrl = config.public.apiBaseUrl
 
-const songs = computed(() => musicStore.songs)
-const loading = computed(() => musicStore.loading)
-const error = computed(() => musicStore.error)
+const songs = ref([])
+const loading = ref(false)
+const error = ref(null)
 
 const selectedSong = ref(null)
 const activeAddTab = ref('youtube')
 const activeEditTab = ref('youtube')
+
+const addForm = ref({
+    youtube_url: '',
+    title: '',
+    artist: '',
+    cover: null,
+    lyrics: '',
+    audioFile: null
+})
+
+const editForm = ref({
+    youtube_url: '',
+    title: '',
+    artist: '',
+    cover: null,
+    lyrics: '',
+    audioFile: null
+})
+
+const submitting = ref(false)
+const deleting = ref(false)
+const errorMessage = ref('')
+
+const addAudioInputKey = ref(0)
+const addCoverInputKey = ref(0)
+const editAudioInputKey = ref(0)
+const editCoverInputKey = ref(0)
+
+const fetchSongs = async () => {
+    loading.value = true
+    error.value = null
+
+    try {
+        const response = await $fetch(`${apiBaseUrl}/songs`)
+
+        if (response.success && response.data) {
+            songs.value = response.data.map(song => ({
+                id: song.id,
+                title: song.title,
+                artist: song.artist,
+                cover: song.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
+                duration: song.duration,
+                audio_url: song.audio_url,
+                youtube_url: song.youtube_url
+            }))
+        }
+    } catch (err) {
+        error.value = err.message || 'Failed to fetch songs'
+        console.error('Error fetching songs:', err)
+        songs.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+const fetchSongDetail = async (songId) => {
+    try {
+        const response = await $fetch(`${apiBaseUrl}/songs/${songId}`)
+
+        if (response.success && response.data) {
+            return {
+                id: response.data.id,
+                title: response.data.title,
+                artist: response.data.artist,
+                cover: response.data.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
+                duration: response.data.duration,
+                audio_url: response.data.audio_url,
+                youtube_url: response.data.youtube_url,
+                lyrics: response.data.lyrics || []
+            }
+        }
+        return null
+    } catch (err) {
+        console.error('Error fetching song detail:', err)
+        return null
+    }
+}
+
+onMounted(() => {
+    fetchSongs()
+})
 
 const formatDuration = (seconds) => {
     if (!seconds) return '-'
@@ -20,24 +101,115 @@ const formatDuration = (seconds) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-const handleEdit = (song) => {
+const formatLyricsForDisplay = (lyrics) => {
+    if (!lyrics || lyrics.length === 0) return ''
+
+    const formatted = lyrics.map(lyric =>
+        `  { "time": "${lyric.time}", "text": "${lyric.text}" }`
+    ).join(',\n')
+
+    return `[\n${formatted}\n]`
+}
+
+const resetAddForm = () => {
+    addForm.value = {
+        youtube_url: '',
+        title: '',
+        artist: '',
+        cover: null,
+        lyrics: '',
+        audioFile: null
+    }
+
+    addAudioInputKey.value++
+    addCoverInputKey.value++
+}
+
+const resetEditForm = () => {
+    editForm.value = {
+        youtube_url: '',
+        title: '',
+        artist: '',
+        cover: null,
+        lyrics: '',
+        audioFile: null
+    }
+
+    editAudioInputKey.value++
+    editCoverInputKey.value++
+}
+
+const handleEdit = async (song) => {
     selectedSong.value = song
     activeEditTab.value = song.youtube_url ? 'youtube' : 'upload'
+    submitting.value = true
+    errorMessage.value = ''
+
+    resetEditForm()
+
+    try {
+        const songDetail = await fetchSongDetail(song.id)
+
+        if (songDetail) {
+            editForm.value = {
+                youtube_url: songDetail.youtube_url || '',
+                title: songDetail.title,
+                artist: songDetail.artist,
+                cover: null,
+                lyrics: songDetail.lyrics && songDetail.lyrics.length > 0
+                    ? formatLyricsForDisplay(songDetail.lyrics)
+                    : '',
+                audioFile: null
+            }
+        } else {
+            editForm.value = {
+                youtube_url: song.youtube_url || '',
+                title: song.title,
+                artist: song.artist,
+                cover: null,
+                lyrics: '',
+                audioFile: null
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching song detail:', err)
+        editForm.value = {
+            youtube_url: song.youtube_url || '',
+            title: song.title,
+            artist: song.artist,
+            cover: null,
+            lyrics: '',
+            audioFile: null
+        }
+    } finally {
+        submitting.value = false
+    }
+
     document.getElementById('edit_modal').showModal()
 }
 
 const handleDelete = (song) => {
     selectedSong.value = song
+    errorMessage.value = ''
     document.getElementById('delete_modal').showModal()
 }
 
 const handleAddNew = () => {
     activeAddTab.value = 'youtube'
+    resetAddForm()
+    errorMessage.value = ''
     document.getElementById('add_modal').showModal()
 }
 
 const closeModal = (modalId) => {
     document.getElementById(modalId).close()
+    errorMessage.value = ''
+
+    if (modalId === 'add_modal') {
+        resetAddForm()
+    } else if (modalId === 'edit_modal') {
+        resetEditForm()
+    }
 }
 
 const switchAddTab = (tab) => {
@@ -46,6 +218,192 @@ const switchAddTab = (tab) => {
 
 const switchEditTab = (tab) => {
     activeEditTab.value = tab
+}
+
+const handleAddAudioFile = (event) => {
+    addForm.value.audioFile = event.target.files[0]
+}
+
+const handleAddCoverFile = (event) => {
+    addForm.value.cover = event.target.files[0]
+}
+
+const handleEditAudioFile = (event) => {
+    editForm.value.audioFile = event.target.files[0]
+}
+
+const handleEditCoverFile = (event) => {
+    editForm.value.cover = event.target.files[0]
+}
+
+const submitAddSong = async () => {
+    errorMessage.value = ''
+    submitting.value = true
+
+    try {
+        if (activeAddTab.value === 'youtube') {
+            if (!addForm.value.youtube_url || !addForm.value.title || !addForm.value.artist) {
+                errorMessage.value = 'YouTube URL, title, and artist are required'
+                return
+            }
+
+            const formData = new FormData()
+            formData.append('youtube_url', addForm.value.youtube_url)
+            formData.append('title', addForm.value.title)
+            formData.append('artist', addForm.value.artist)
+
+            if (addForm.value.cover instanceof File) {
+                formData.append('cover', addForm.value.cover)
+            }
+
+            if (addForm.value.lyrics) {
+                try {
+                    const parsedLyrics = JSON.parse(addForm.value.lyrics)
+                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                } catch (e) {
+                    errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
+                    return
+                }
+            }
+
+            const response = await $fetch(`${apiBaseUrl}/songs/download`, {
+                method: 'POST',
+                body: formData
+            })
+
+            if (response.success) {
+                resetAddForm()
+                await fetchSongs()
+                closeModal('add_modal')
+            }
+        } else {
+            if (!addForm.value.audioFile || !addForm.value.title || !addForm.value.artist) {
+                errorMessage.value = 'Audio file, title, and artist are required'
+                return
+            }
+
+            const formData = new FormData()
+            formData.append('audio', addForm.value.audioFile)
+            formData.append('title', addForm.value.title)
+            formData.append('artist', addForm.value.artist)
+
+            if (addForm.value.cover instanceof File) {
+                formData.append('cover', addForm.value.cover)
+            }
+
+            if (addForm.value.lyrics) {
+                try {
+                    const parsedLyrics = JSON.parse(addForm.value.lyrics)
+                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                } catch (e) {
+                    errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
+                    return
+                }
+            }
+
+            const response = await $fetch(`${apiBaseUrl}/songs/upload`, {
+                method: 'POST',
+                body: formData
+            })
+
+            if (response.success) {
+                resetAddForm()
+                await fetchSongs()
+                closeModal('add_modal')
+            }
+        }
+    } catch (err) {
+        console.error('Add song error:', err)
+        errorMessage.value = err.data?.message || err.message || 'Failed to add song'
+    } finally {
+        submitting.value = false
+    }
+}
+
+const submitEditSong = async () => {
+    if (!selectedSong.value) return
+
+    errorMessage.value = ''
+    submitting.value = true
+
+    try {
+        const formData = new FormData()
+
+        if (activeEditTab.value === 'youtube') {
+            if (editForm.value.youtube_url && editForm.value.youtube_url !== selectedSong.value.youtube_url) {
+                formData.append('youtube_url', editForm.value.youtube_url)
+            }
+        } else {
+            if (editForm.value.audioFile instanceof File) {
+                formData.append('audio', editForm.value.audioFile)
+            }
+        }
+
+        if (editForm.value.title) {
+            formData.append('title', editForm.value.title)
+        }
+
+        if (editForm.value.artist) {
+            formData.append('artist', editForm.value.artist)
+        }
+
+        if (editForm.value.cover instanceof File) {
+            formData.append('cover', editForm.value.cover)
+        }
+
+        if (editForm.value.lyrics !== null && editForm.value.lyrics !== undefined) {
+            if (editForm.value.lyrics.trim() === '') {
+                formData.append('lyrics', JSON.stringify([]))
+            } else {
+                try {
+                    const parsedLyrics = JSON.parse(editForm.value.lyrics)
+                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                } catch (e) {
+                    errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
+                    return
+                }
+            }
+        }
+
+        const response = await $fetch(`${apiBaseUrl}/songs/${selectedSong.value.id}`, {
+            method: 'PUT',
+            body: formData
+        })
+
+        if (response.success) {
+            resetEditForm()
+            await fetchSongs()
+            closeModal('edit_modal')
+        }
+    } catch (err) {
+        console.error('Edit song error:', err)
+        errorMessage.value = err.data?.message || err.message || 'Failed to update song'
+    } finally {
+        submitting.value = false
+    }
+}
+
+const submitDeleteSong = async () => {
+    if (!selectedSong.value) return
+
+    errorMessage.value = ''
+    deleting.value = true
+
+    try {
+        const response = await $fetch(`${apiBaseUrl}/songs/${selectedSong.value.id}`, {
+            method: 'DELETE'
+        })
+
+        if (response.success) {
+            await fetchSongs()
+            closeModal('delete_modal')
+        }
+    } catch (err) {
+        console.error('Delete song error:', err)
+        errorMessage.value = err.data?.message || err.message || 'Failed to delete song'
+    } finally {
+        deleting.value = false
+    }
 }
 </script>
 
@@ -176,12 +534,19 @@ const switchEditTab = (tab) => {
                     </button>
                 </div>
 
+                <div v-if="errorMessage" class="alert alert-error mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ errorMessage }}</span>
+                </div>
+
                 <div class="space-y-4">
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text font-semibold mb-2">
-                                Audio Source
-                            </span>
+                            <span class="label-text font-semibold mb-2">Audio Source</span>
                         </label>
 
                         <div class="flex flex-col sm:flex-row gap-4 mb-4">
@@ -209,67 +574,79 @@ const switchEditTab = (tab) => {
                         </div>
 
                         <div v-if="activeAddTab === 'youtube'">
-                            <input type="url" placeholder="https://youtu.be/..." class="input input-bordered w-full" />
+                            <input v-model="addForm.youtube_url" type="url" placeholder="https://youtu.be/..."
+                                class="input input-bordered w-full" />
                             <label class="label text-xs">Paste YouTube video URL</label>
                         </div>
 
                         <div v-if="activeAddTab === 'upload'">
-                            <input type="file" class="file-input file-input-bordered w-full" accept="audio/*" />
+                            <input @change="handleAddAudioFile" type="file"
+                                class="file-input file-input-bordered w-full" accept="audio/*"
+                                :key="addAudioInputKey" />
                             <label class="label text-xs">Supported: MP3, WAV, OGG, M4A</label>
                         </div>
                     </div>
 
                     <div>
-                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                             <div class="form-control w-full">
                                 <label class="label">
                                     <span class="label-text font-semibold mb-2">Title</span>
                                 </label>
-                                <input type="text" placeholder="Music title" class="input input-bordered w-full" />
+                                <input v-model="addForm.title" type="text" placeholder="Music title"
+                                    class="input input-bordered w-full" />
                             </div>
 
                             <div class="form-control w-full">
                                 <label class="label">
                                     <span class="label-text font-semibold mb-2">Artist</span>
                                 </label>
-                                <input type="text" placeholder="Artist name" class="input input-bordered w-full" />
+                                <input v-model="addForm.artist" type="text" placeholder="Artist name"
+                                    class="input input-bordered w-full" />
                             </div>
                         </div>
                     </div>
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text font-semibold mb-2">
-                                Cover Image
-                            </span>
+                            <span class="label-text font-semibold mb-2">Cover Image</span>
                         </label>
-                        <input type="file" class="file-input file-input-bordered w-full" accept="image/*" />
+                        <input @change="handleAddCoverFile" type="file" class="file-input file-input-bordered w-full"
+                            accept="image/*" :key="addCoverInputKey" />
                         <label class="label text-xs">Recommended: Square image, min 500x500px</label>
                     </div>
 
-                   <div class="form-control flex flex-col w-full">
+                    <div class="form-control flex flex-col w-full">
                         <label class="label">
-                            <span class="label-text font-semibold mb-2">
-                                Lyrics (Optional)
-                            </span>
+                            <span class="label-text font-semibold mb-2">Lyrics (Optional)</span>
                         </label>
 
-                        <textarea class="textarea textarea-bordered h-24 w-full" placeholder='{ "time": "8.05", "text": "Sejuta bayangan dirimu" },'></textarea>
+                        <textarea v-model="addForm.lyrics" class="textarea textarea-bordered h-24 w-full"
+                            placeholder='[
+    { "time": "1.80", "text": "Dalam benakku lama tertanam" },
+    { "time": "8.05", "text": "Sejuta bayangan dirimu" },
+    { "time": "14.54", "text": "Redup terasa cahaya hati" }
+]'></textarea>
 
                         <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
                     </div>
                 </div>
 
                 <div class="modal-action mt-6">
-                    <button @click="closeModal('add_modal')" class="btn btn-ghost">Cancel</button>
-                    <button class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor" class="w-5 h-5">
+                    <button @click="closeModal('add_modal')" class="btn btn-ghost"
+                        :disabled="submitting">Cancel</button>
+                    <button @click="submitAddSong" class="btn btn-primary" :disabled="submitting">
+                        <span v-if="submitting" class="loading loading-spinner"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
-                        Add Music
+                        {{ submitting ? 'Adding...' : 'Add Music' }}
                     </button>
                 </div>
+                <p class="text-xs text-base-content/60 text-right mt-2">
+                    Note: Adding music may take a few moments.
+                </p>
             </div>
         </dialog>
 
@@ -282,13 +659,20 @@ const switchEditTab = (tab) => {
                     </button>
                 </div>
 
+                <div v-if="errorMessage" class="alert alert-error mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ errorMessage }}</span>
+                </div>
+
                 <div v-if="selectedSong">
                     <div class="space-y-4">
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text font-semibold mb-2">
-                                    Audio Source
-                                </span>
+                                <span class="label-text font-semibold mb-2">Audio Source</span>
                             </label>
 
                             <div class="alert mb-4" :class="selectedSong.youtube_url ? 'alert-info' : 'alert-success'">
@@ -297,7 +681,7 @@ const switchEditTab = (tab) => {
                                     <Upload v-else :size="20" />
                                     <div>
                                         <p class="font-semibold">
-                                            Current Source: {{ selectedSong.youtube_url ? 'YouTube' : 'Uploaded File' }}
+                                            Current: {{ selectedSong.youtube_url ? 'YouTube' : 'Uploaded File' }}
                                         </p>
                                         <p class="text-sm opacity-80" v-if="selectedSong.youtube_url">
                                             {{ selectedSong.youtube_url }}
@@ -309,14 +693,45 @@ const switchEditTab = (tab) => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label class="label">
-                                    <span class="label-text mb-2">
-                                        {{ selectedSong.youtube_url ? 'Upload new audio to replace' : 'Replace with new audio' }}
-                                    </span>
+                            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                                <label
+                                    class="label cursor-pointer justify-start gap-3 bg-base-200 rounded-lg p-4 flex-1 hover:bg-base-300 transition-colors"
+                                    :class="{ 'ring-2 ring-primary': activeEditTab === 'youtube' }">
+                                    <input type="radio" name="edit-source" class="radio radio-primary"
+                                        :checked="activeEditTab === 'youtube'" @change="switchEditTab('youtube')" />
+                                    <div class="flex items-center gap-2">
+                                        <Link :size="18" />
+                                        <span class="label-text font-medium">YouTube URL</span>
+                                    </div>
                                 </label>
-                                <input type="file" class="file-input file-input-bordered w-full" accept="audio/*" />
-                                <label class="label text-xs mt-2">Leave empty to keep current audio source</label>
+
+                                <label
+                                    class="label cursor-pointer justify-start gap-3 bg-base-200 rounded-lg p-4 flex-1 hover:bg-base-300 transition-colors"
+                                    :class="{ 'ring-2 ring-primary': activeEditTab === 'upload' }">
+                                    <input type="radio" name="edit-source" class="radio radio-primary"
+                                        :checked="activeEditTab === 'upload'" @change="switchEditTab('upload')" />
+                                    <div class="flex items-center gap-2">
+                                        <Upload :size="18" />
+                                        <span class="label-text font-medium">Upload Audio File</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div v-if="activeEditTab === 'youtube'">
+                                <input v-model="editForm.youtube_url" type="url" placeholder="https://youtu.be/..."
+                                    class="input input-bordered w-full" />
+                                <label class="label text-xs">
+                                    {{ selectedSong.youtube_url ? 'Update YouTube URL or leave unchanged' : 'Add YouTube URL to replace uploaded file' }}
+                                </label>
+                            </div>
+
+                            <div v-if="activeEditTab === 'upload'">
+                                <input @change="handleEditAudioFile" type="file"
+                                    class="file-input file-input-bordered w-full" accept="audio/*"
+                                    :key="editAudioInputKey" />
+                                <label class="label text-xs">
+                                    {{ selectedSong.youtube_url ? 'Upload audio file to replace YouTube source' : 'Upload new audio file or leave unchanged' }}
+                                </label>
                             </div>
                         </div>
 
@@ -326,54 +741,61 @@ const switchEditTab = (tab) => {
                                     <label class="label">
                                         <span class="label-text font-semibold mb-2">Title</span>
                                     </label>
-                                    <input type="text" placeholder="Music title" class="input input-bordered w-full" />
+                                    <input v-model="editForm.title" type="text" placeholder="Music title"
+                                        class="input input-bordered w-full" />
                                 </div>
 
                                 <div class="form-control w-full">
                                     <label class="label">
                                         <span class="label-text font-semibold mb-2">Artist</span>
                                     </label>
-                                    <input type="text" placeholder="Artist name" class="input input-bordered w-full" />
+                                    <input v-model="editForm.artist" type="text" placeholder="Artist name"
+                                        class="input input-bordered w-full" />
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text font-semibold mb-2">
-                                    Cover Image
-                                </span>
+                                <span class="label-text font-semibold mb-2">Cover Image</span>
                             </label>
-                            <input type="file" class="file-input file-input-bordered w-full" accept="image/*" />
+                            <input @change="handleEditCoverFile" type="file"
+                                class="file-input file-input-bordered w-full" accept="image/*"
+                                :key="editCoverInputKey" />
                             <label class="label text-xs">Upload new cover or leave empty to keep current</label>
                         </div>
 
                         <div class="form-control flex flex-col w-full">
                             <label class="label">
-                                <span class="label-text font-semibold mb-2">
-                                    Lyrics (Optional)
-                                </span>
+                                <span class="label-text font-semibold mb-2">Lyrics (Optional)</span>
                             </label>
+                            <textarea v-model="editForm.lyrics" class="textarea textarea-bordered h-24 w-full"
+                                placeholder='[
+    { "time": "1.80", "text": "Dalam benakku lama tertanam" },
+    { "time": "8.05", "text": "Sejuta bayangan dirimu" },
+    { "time": "14.54", "text": "Redup terasa cahaya hati" }
+]'></textarea>
 
-                            <textarea class="textarea textarea-bordered h-24 w-full"
-                                placeholder='{ "time": "8.05", "text": "Sejuta bayangan dirimu" },'></textarea>
-
-                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics
-                                text"}]</label>
+                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
                         </div>
                     </div>
                 </div>
 
                 <div class="modal-action mt-6">
-                    <button @click="closeModal('edit_modal')" class="btn btn-ghost">Cancel</button>
-                    <button class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor" class="w-5 h-5">
+                    <button @click="closeModal('edit_modal')" class="btn btn-ghost"
+                        :disabled="submitting">Cancel</button>
+                    <button @click="submitEditSong" class="btn btn-primary" :disabled="submitting">
+                        <span v-if="submitting" class="loading loading-spinner"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
-                        Save Changes
+                        {{ submitting ? 'Saving...' : 'Save Changes' }}
                     </button>
                 </div>
+                <p class="text-xs text-base-content/60 text-right mt-2">
+                    Note: Updating audio source may take a few moments.
+                </p>
             </div>
         </dialog>
 
@@ -384,6 +806,15 @@ const switchEditTab = (tab) => {
                     <button @click="closeModal('delete_modal')" class="btn btn-sm btn-circle btn-ghost">
                         <X :size="18" />
                     </button>
+                </div>
+
+                <div v-if="errorMessage" class="alert alert-error mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ errorMessage }}</span>
                 </div>
 
                 <div v-if="selectedSong" class="py-4">
@@ -402,14 +833,16 @@ const switchEditTab = (tab) => {
                 </div>
 
                 <div class="modal-action">
-                    <button @click="closeModal('delete_modal')" class="btn btn-ghost">Cancel</button>
-                    <button class="btn btn-error">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor" class="w-5 h-5">
+                    <button @click="closeModal('delete_modal')" class="btn btn-ghost"
+                        :disabled="deleting">Cancel</button>
+                    <button @click="submitDeleteSong" class="btn btn-error" :disabled="deleting">
+                        <span v-if="deleting" class="loading loading-spinner"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                         </svg>
-                        Delete
+                        {{ deleting ? 'Deleting...' : 'Delete' }}
                     </button>
                 </div>
             </div>

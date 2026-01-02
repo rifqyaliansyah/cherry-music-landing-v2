@@ -19,11 +19,20 @@ const shuffledIndices = ref([])
 const isUserSeeking = ref(false)
 const audioRef = ref(null)
 
+const songs = ref([])
+
+const loadSongs = async () => {
+    try {
+        songs.value = await musicStore.fetchSongs()
+    } catch (err) {
+        console.error('Error loading songs:', err)
+        songs.value = []
+    }
+}
+
 const contentMarginClass = computed(() => {
     return currentSong.value ? 'mb-[105px]' : ''
 })
-
-const songs = computed(() => musicStore.songs)
 
 const loadAndPlayAudio = async (song) => {
     if (!audioRef.value) return
@@ -421,7 +430,7 @@ watch(songs, () => {
 })
 
 onMounted(async () => {
-    await musicStore.fetchSongs()
+    await loadSongs()
     restorePlaybackSettings()
     await restorePlayerState()
     setupAudioEvents()

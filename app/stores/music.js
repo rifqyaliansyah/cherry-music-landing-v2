@@ -5,33 +5,17 @@ const PLAYBACK_SETTINGS_KEY = 'playback_settings'
 
 export const useMusicStore = defineStore('music', {
     state: () => ({
-        songs: [],
-        loading: false,
-        error: null,
-        songDetails: {},
-        loadingDetail: false,
-        errorDetail: null
+        // Tidak ada state untuk songs dan songDetails lagi
+        // Semua akan fetch langsung dari API
     }),
 
     getters: {
-        hasSongs: (state) => state.songs.length > 0,
-        getSongById: (state) => (id) => {
-            return state.songs.find(song => song.id === id)
-        },
-        getSongDetail: (state) => (id) => {
-            return state.songDetails[id] || null
-        },
-        hasLyrics: (state) => (id) => {
-            const detail = state.songDetails[id]
-            return detail && detail.lyrics && detail.lyrics.length > 0
-        }
+        // Getters dihapus karena tidak ada state lagi
     },
 
     actions: {
+        // Fetch songs langsung dari API tanpa simpan ke state
         async fetchSongs() {
-            this.loading = true
-            this.error = null
-
             try {
                 const config = useRuntimeConfig()
                 const apiBaseUrl = config.public.apiBaseUrl
@@ -39,7 +23,7 @@ export const useMusicStore = defineStore('music', {
                 const response = await $fetch(`${apiBaseUrl}/songs`)
 
                 if (response.success && response.data) {
-                    this.songs = response.data.map(song => ({
+                    return response.data.map(song => ({
                         id: song.id,
                         title: song.title,
                         artist: song.artist,
@@ -49,23 +33,15 @@ export const useMusicStore = defineStore('music', {
                         youtube_url: song.youtube_url
                     }))
                 }
+                return []
             } catch (err) {
-                this.error = err.message || 'Failed to fetch songs'
                 console.error('Error fetching songs:', err)
-                this.songs = []
-            } finally {
-                this.loading = false
+                throw new Error(err.message || 'Failed to fetch songs')
             }
         },
 
+        // Fetch song detail langsung dari API tanpa cache
         async fetchSongDetail(songId) {
-            if (this.songDetails[songId]) {
-                return this.songDetails[songId]
-            }
-
-            this.loadingDetail = true
-            this.errorDetail = null
-
             try {
                 const config = useRuntimeConfig()
                 const apiBaseUrl = config.public.apiBaseUrl
@@ -73,7 +49,7 @@ export const useMusicStore = defineStore('music', {
                 const response = await $fetch(`${apiBaseUrl}/songs/${songId}`)
 
                 if (response.success && response.data) {
-                    const songDetail = {
+                    return {
                         id: response.data.id,
                         title: response.data.title,
                         artist: response.data.artist,
@@ -83,25 +59,11 @@ export const useMusicStore = defineStore('music', {
                         youtube_url: response.data.youtube_url,
                         lyrics: response.data.lyrics || []
                     }
-
-                    this.songDetails[songId] = songDetail
-
-                    return songDetail
                 }
+                return null
             } catch (err) {
-                this.errorDetail = err.message || 'Failed to fetch song detail'
                 console.error('Error fetching song detail:', err)
                 return null
-            } finally {
-                this.loadingDetail = false
-            }
-        },
-
-        clearDetailCache(songId) {
-            if (songId) {
-                delete this.songDetails[songId]
-            } else {
-                this.songDetails = {}
             }
         },
 
@@ -141,7 +103,6 @@ export const useMusicStore = defineStore('music', {
 
                 const state = JSON.parse(saved)
 
-                // Validate state structure
                 if (!state.currentSong || !state.currentSong.id) {
                     this.clearPlayerState()
                     return null
@@ -163,30 +124,23 @@ export const useMusicStore = defineStore('music', {
             }
         },
 
-        // Validate if saved song still exists
+        // Validate if saved song still exists (fetch dari API)
         async validateSavedSong(songId) {
-            // Wait for songs to be loaded
-            if (this.loading) {
-                await new Promise(resolve => {
-                    const checkInterval = setInterval(() => {
-                        if (!this.loading) {
-                            clearInterval(checkInterval)
-                            resolve()
-                        }
-                    }, 100)
-                })
-            }
+            try {
+                const songs = await this.fetchSongs()
+                const songExists = songs.some(song => song.id === songId)
 
-            // Check if song exists in current songs list
-            const songExists = this.songs.some(song => song.id === songId)
+                if (!songExists) {
+                    console.warn(`Song ${songId} not found, clearing player state`)
+                    this.clearPlayerState()
+                    return false
+                }
 
-            if (!songExists) {
-                console.warn(`Song ${songId} not found, clearing player state`)
-                this.clearPlayerState()
+                return true
+            } catch (err) {
+                console.error('Error validating saved song:', err)
                 return false
             }
-
-            return true
         },
 
         // LocalStorage actions for playback settings
