@@ -35,6 +35,12 @@ const submitting = ref(false)
 const deleting = ref(false)
 const errorMessage = ref('')
 
+// Keys untuk reset input file
+const addAudioInputKey = ref(0)
+const addCoverInputKey = ref(0)
+const editAudioInputKey = ref(0)
+const editCoverInputKey = ref(0)
+
 // Fetch songs dari API
 const fetchSongs = async () => {
     loading.value = true
@@ -108,11 +114,44 @@ const formatLyricsForDisplay = (lyrics) => {
     return `[\n${formatted}\n]`
 }
 
+// Reset form functions
+const resetAddForm = () => {
+    addForm.value = {
+        youtube_url: '',
+        title: '',
+        artist: '',
+        cover: null,
+        lyrics: '',
+        audioFile: null
+    }
+
+    // Increment key untuk force re-render input
+    addAudioInputKey.value++
+    addCoverInputKey.value++
+}
+
+const resetEditForm = () => {
+    editForm.value = {
+        title: '',
+        artist: '',
+        cover: null,
+        lyrics: '',
+        audioFile: null
+    }
+
+    // Increment key untuk force re-render input
+    editAudioInputKey.value++
+    editCoverInputKey.value++
+}
+
 const handleEdit = async (song) => {
     selectedSong.value = song
     activeEditTab.value = song.youtube_url ? 'youtube' : 'upload'
     submitting.value = true
     errorMessage.value = ''
+
+    // Reset form edit terlebih dahulu
+    resetEditForm()
 
     try {
         const songDetail = await fetchSongDetail(song.id)
@@ -160,14 +199,7 @@ const handleDelete = (song) => {
 
 const handleAddNew = () => {
     activeAddTab.value = 'youtube'
-    addForm.value = {
-        youtube_url: '',
-        title: '',
-        artist: '',
-        cover: null,
-        lyrics: '',
-        audioFile: null
-    }
+    resetAddForm()
     errorMessage.value = ''
     document.getElementById('add_modal').showModal()
 }
@@ -175,6 +207,13 @@ const handleAddNew = () => {
 const closeModal = (modalId) => {
     document.getElementById(modalId).close()
     errorMessage.value = ''
+
+    // Reset form saat modal ditutup
+    if (modalId === 'add_modal') {
+        resetAddForm()
+    } else if (modalId === 'edit_modal') {
+        resetEditForm()
+    }
 }
 
 const switchAddTab = (tab) => {
@@ -237,6 +276,7 @@ const submitAddSong = async () => {
             })
 
             if (response.success) {
+                resetAddForm() // Reset form setelah berhasil
                 await fetchSongs()
                 closeModal('add_modal')
             }
@@ -271,6 +311,7 @@ const submitAddSong = async () => {
             })
 
             if (response.success) {
+                resetAddForm() // Reset form setelah berhasil
                 await fetchSongs()
                 closeModal('add_modal')
             }
@@ -328,6 +369,7 @@ const submitEditSong = async () => {
         })
 
         if (response.success) {
+            resetEditForm() // Reset form setelah berhasil
             await fetchSongs()
             closeModal('edit_modal')
         }
@@ -481,7 +523,7 @@ const submitDeleteSong = async () => {
             </div>
         </div>
 
-        <!-- Add Modal (sama seperti sebelumnya) -->
+        <!-- Add Modal -->
         <dialog id="add_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box max-w-3xl">
                 <div class="flex items-center justify-between mb-6">
@@ -540,7 +582,8 @@ const submitDeleteSong = async () => {
 
                         <div v-if="activeAddTab === 'upload'">
                             <input @change="handleAddAudioFile" type="file"
-                                class="file-input file-input-bordered w-full" accept="audio/*" />
+                                class="file-input file-input-bordered w-full" accept="audio/*"
+                                :key="addAudioInputKey" />
                             <label class="label text-xs">Supported: MP3, WAV, OGG, M4A</label>
                         </div>
                     </div>
@@ -572,7 +615,7 @@ const submitDeleteSong = async () => {
                             </span>
                         </label>
                         <input @change="handleAddCoverFile" type="file" class="file-input file-input-bordered w-full"
-                            accept="image/*" />
+                            accept="image/*" :key="addCoverInputKey" />
                         <label class="label text-xs">Recommended: Square image, min 500x500px</label>
                     </div>
 
@@ -605,7 +648,7 @@ const submitDeleteSong = async () => {
             </div>
         </dialog>
 
-        <!-- Edit Modal (sama seperti sebelumnya) -->
+        <!-- Edit Modal -->
         <dialog id="edit_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box max-w-3xl">
                 <div class="flex items-center justify-between mb-6">
@@ -658,7 +701,8 @@ const submitDeleteSong = async () => {
                                     </span>
                                 </label>
                                 <input @change="handleEditAudioFile" type="file"
-                                    class="file-input file-input-bordered w-full" accept="audio/*" />
+                                    class="file-input file-input-bordered w-full" accept="audio/*"
+                                    :key="editAudioInputKey" />
                                 <label class="label text-xs mt-2">Leave empty to keep current audio source</label>
                             </div>
                         </div>
@@ -690,10 +734,12 @@ const submitDeleteSong = async () => {
                                 </span>
                             </label>
                             <input @change="handleEditCoverFile" type="file"
-                                class="file-input file-input-bordered w-full" accept="image/*" />
+                                class="file-input file-input-bordered w-full" accept="image/*"
+                                :key="editCoverInputKey" />
                             <label class="label text-xs">Upload new cover or leave empty to keep current</label>
                         </div>
-                       <div class="form-control flex flex-col w-full">
+
+                        <div class="form-control flex flex-col w-full">
                             <label class="label">
                                 <span class="label-text font-semibold mb-2">
                                     Lyrics (Optional)
@@ -723,7 +769,7 @@ const submitDeleteSong = async () => {
             </div>
         </dialog>
 
-        <!-- Delete Modal (sama seperti sebelumnya) -->
+        <!-- Delete Modal -->
         <dialog id="delete_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box">
                 <div class="flex items-center justify-between mb-4">
