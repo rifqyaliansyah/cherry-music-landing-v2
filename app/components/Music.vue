@@ -1,15 +1,14 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useMusicStore } from '~/stores/music'
+import { ref, onMounted } from 'vue'
 import { Clock3, X, Upload, Link } from 'lucide-vue-next'
 
-const musicStore = useMusicStore()
 const config = useRuntimeConfig()
 const apiBaseUrl = config.public.apiBaseUrl
 
-const songs = computed(() => musicStore.songs)
-const loading = computed(() => musicStore.loading)
-const error = computed(() => musicStore.error)
+// Local state (tidak pakai store)
+const songs = ref([])
+const loading = ref(false)
+const error = ref(null)
 
 const selectedSong = ref(null)
 const activeAddTab = ref('youtube')
@@ -36,8 +35,60 @@ const submitting = ref(false)
 const deleting = ref(false)
 const errorMessage = ref('')
 
+// Fetch songs dari API
+const fetchSongs = async () => {
+    loading.value = true
+    error.value = null
+
+    try {
+        const response = await $fetch(`${apiBaseUrl}/songs`)
+
+        if (response.success && response.data) {
+            songs.value = response.data.map(song => ({
+                id: song.id,
+                title: song.title,
+                artist: song.artist,
+                cover: song.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
+                duration: song.duration,
+                audio_url: song.audio_url,
+                youtube_url: song.youtube_url
+            }))
+        }
+    } catch (err) {
+        error.value = err.message || 'Failed to fetch songs'
+        console.error('Error fetching songs:', err)
+        songs.value = []
+    } finally {
+        loading.value = false
+    }
+}
+
+// Fetch song detail dari API
+const fetchSongDetail = async (songId) => {
+    try {
+        const response = await $fetch(`${apiBaseUrl}/songs/${songId}`)
+
+        if (response.success && response.data) {
+            return {
+                id: response.data.id,
+                title: response.data.title,
+                artist: response.data.artist,
+                cover: response.data.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
+                duration: response.data.duration,
+                audio_url: response.data.audio_url,
+                youtube_url: response.data.youtube_url,
+                lyrics: response.data.lyrics || []
+            }
+        }
+        return null
+    } catch (err) {
+        console.error('Error fetching song detail:', err)
+        return null
+    }
+}
+
 onMounted(() => {
-    musicStore.fetchSongs()
+    fetchSongs()
 })
 
 const formatDuration = (seconds) => {
@@ -47,19 +98,57 @@ const formatDuration = (seconds) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-const handleEdit = (song) => {
+const formatLyricsForDisplay = (lyrics) => {
+    if (!lyrics || lyrics.length === 0) return ''
+
+    const formatted = lyrics.map(lyric =>
+        `  { "time": "${lyric.time}", "text": "${lyric.text}" }`
+    ).join(',\n')
+
+    return `[\n${formatted}\n]`
+}
+
+const handleEdit = async (song) => {
     selectedSong.value = song
     activeEditTab.value = song.youtube_url ? 'youtube' : 'upload'
+    submitting.value = true
+    errorMessage.value = ''
 
-    editForm.value = {
-        title: song.title,
-        artist: song.artist,
-        cover: null,
-        lyrics: song.lyrics ? JSON.stringify(song.lyrics, null, 2) : '',
-        audioFile: null
+    try {
+        const songDetail = await fetchSongDetail(song.id)
+
+        if (songDetail) {
+            editForm.value = {
+                title: songDetail.title,
+                artist: songDetail.artist,
+                cover: null,
+                lyrics: songDetail.lyrics && songDetail.lyrics.length > 0
+                    ? formatLyricsForDisplay(songDetail.lyrics)
+                    : '',
+                audioFile: null
+            }
+        } else {
+            editForm.value = {
+                title: song.title,
+                artist: song.artist,
+                cover: null,
+                lyrics: '',
+                audioFile: null
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching song detail:', err)
+        editForm.value = {
+            title: song.title,
+            artist: song.artist,
+            cover: null,
+            lyrics: '',
+            audioFile: null
+        }
+    } finally {
+        submitting.value = false
     }
 
-    errorMessage.value = ''
     document.getElementById('edit_modal').showModal()
 }
 
@@ -128,7 +217,7 @@ const submitAddSong = async () => {
             formData.append('title', addForm.value.title)
             formData.append('artist', addForm.value.artist)
 
-            if (addForm.value.cover) {
+            if (addForm.value.cover instanceof File) {
                 formData.append('cover', addForm.value.cover)
             }
 
@@ -148,7 +237,7 @@ const submitAddSong = async () => {
             })
 
             if (response.success) {
-                await musicStore.fetchSongs()
+                await fetchSongs()
                 closeModal('add_modal')
             }
         } else {
@@ -162,7 +251,7 @@ const submitAddSong = async () => {
             formData.append('title', addForm.value.title)
             formData.append('artist', addForm.value.artist)
 
-            if (addForm.value.cover) {
+            if (addForm.value.cover instanceof File) {
                 formData.append('cover', addForm.value.cover)
             }
 
@@ -182,7 +271,7 @@ const submitAddSong = async () => {
             })
 
             if (response.success) {
-                await musicStore.fetchSongs()
+                await fetchSongs()
                 closeModal('add_modal')
             }
         }
@@ -211,21 +300,25 @@ const submitEditSong = async () => {
             formData.append('artist', editForm.value.artist)
         }
 
-        if (editForm.value.audioFile) {
+        if (editForm.value.audioFile instanceof File) {
             formData.append('audio', editForm.value.audioFile)
         }
 
-        if (editForm.value.cover) {
+        if (editForm.value.cover instanceof File) {
             formData.append('cover', editForm.value.cover)
         }
 
-        if (editForm.value.lyrics) {
-            try {
-                const parsedLyrics = JSON.parse(editForm.value.lyrics)
-                formData.append('lyrics', JSON.stringify(parsedLyrics))
-            } catch (e) {
-                errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
-                return
+        if (editForm.value.lyrics !== null && editForm.value.lyrics !== undefined) {
+            if (editForm.value.lyrics.trim() === '') {
+                formData.append('lyrics', JSON.stringify([]))
+            } else {
+                try {
+                    const parsedLyrics = JSON.parse(editForm.value.lyrics)
+                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                } catch (e) {
+                    errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
+                    return
+                }
             }
         }
 
@@ -235,7 +328,7 @@ const submitEditSong = async () => {
         })
 
         if (response.success) {
-            await musicStore.fetchSongs()
+            await fetchSongs()
             closeModal('edit_modal')
         }
     } catch (err) {
@@ -258,7 +351,7 @@ const submitDeleteSong = async () => {
         })
 
         if (response.success) {
-            await musicStore.fetchSongs()
+            await fetchSongs()
             closeModal('delete_modal')
         }
     } catch (err) {
@@ -388,6 +481,7 @@ const submitDeleteSong = async () => {
             </div>
         </div>
 
+        <!-- Add Modal (sama seperti sebelumnya) -->
         <dialog id="add_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box max-w-3xl">
                 <div class="flex items-center justify-between mb-6">
@@ -511,6 +605,7 @@ const submitDeleteSong = async () => {
             </div>
         </dialog>
 
+        <!-- Edit Modal (sama seperti sebelumnya) -->
         <dialog id="edit_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box max-w-3xl">
                 <div class="flex items-center justify-between mb-6">
@@ -598,14 +693,12 @@ const submitDeleteSong = async () => {
                                 class="file-input file-input-bordered w-full" accept="image/*" />
                             <label class="label text-xs">Upload new cover or leave empty to keep current</label>
                         </div>
-
-                        <div class="form-control flex flex-col w-full">
+                       <div class="form-control flex flex-col w-full">
                             <label class="label">
                                 <span class="label-text font-semibold mb-2">
                                     Lyrics (Optional)
                                 </span>
                             </label>
-
                             <textarea v-model="editForm.lyrics" class="textarea textarea-bordered h-24 w-full"
                                 placeholder='[{"time": "8.05", "text": "Sejuta bayangan dirimu"}]'></textarea>
 
@@ -629,7 +722,8 @@ const submitDeleteSong = async () => {
                 </div>
             </div>
         </dialog>
-        
+
+        <!-- Delete Modal (sama seperti sebelumnya) -->
         <dialog id="delete_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box">
                 <div class="flex items-center justify-between mb-4">
