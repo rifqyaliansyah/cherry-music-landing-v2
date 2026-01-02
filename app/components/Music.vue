@@ -441,7 +441,7 @@ const submitDeleteSong = async () => {
                             d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                     </svg>
                     <p class="text-lg opacity-60 mb-4">No songs found</p>
-                    <button @click="handleAddNew" class="btn btn-primary">Add Your First Song</button>
+                    <!-- <button @click="handleAddNew" class="btn btn-primary">Add Your First Song</button> -->
                 </div>
 
                 <div v-else class="overflow-x-auto">
