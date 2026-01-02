@@ -238,7 +238,7 @@ const submitAddSong = async () => {
                 lyrics: parsedLyrics
             }
 
-            await musicStore.downloadFromYouTube(addForm.value.youtube_url, metadata)
+            await musicStore.downloadFromYouTubeOnly(addForm.value.youtube_url, metadata)
 
             resetAddForm()
             await fetchSongs()

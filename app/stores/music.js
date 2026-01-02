@@ -250,6 +250,62 @@ export const useMusicStore = defineStore('music', {
                 console.error('Error loading playback settings:', err)
                 return null
             }
+        },
+        
+        async downloadFromYouTubeOnly(youtubeUrl, metadata) {
+            try {
+                const config = useRuntimeConfig()
+                const apiBaseUrl = config.public.apiBaseUrl
+
+                const formData = new FormData()
+                formData.append('youtube_url', youtubeUrl)
+                formData.append('title', metadata.title)
+                formData.append('artist', metadata.artist)
+
+                if (metadata.cover instanceof File) {
+                    formData.append('cover', metadata.cover)
+                }
+
+                if (metadata.lyrics) {
+                    formData.append('lyrics', JSON.stringify(metadata.lyrics))
+                }
+
+                const response = await $fetch(`${apiBaseUrl}/songs/download-only`, {
+                    method: 'POST',
+                    body: formData
+                })
+
+                if (response.success && response.data) {
+                    const audioResponse = await fetch(response.data.audio_url)
+                    const audioBlob = await audioResponse.blob()
+
+                    let coverBlob = null
+                    if (response.data.cover_url && !response.data.cover_url.includes('placehold.co')) {
+                        const coverResponse = await fetch(response.data.cover_url)
+                        coverBlob = await coverResponse.blob()
+                    } else if (metadata.cover instanceof File) {
+                        coverBlob = metadata.cover
+                    }
+
+                    const songData = {
+                        title: response.data.title,
+                        artist: response.data.artist,
+                        audioBlob: audioBlob,
+                        coverBlob: coverBlob,
+                        duration: response.data.duration || 0,
+                        lyrics: metadata.lyrics || [],
+                        youtube_url: youtubeUrl
+                    }
+
+                    const savedSong = await this.addNewSong(songData)
+                    return savedSong
+                }
+
+                throw new Error('Failed to download from YouTube')
+            } catch (err) {
+                console.error('Error downloading from YouTube:', err)
+                throw err
+            }
         }
     }
 })
