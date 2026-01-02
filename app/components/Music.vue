@@ -1,13 +1,17 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useMusicStore } from '~/stores/music'
-import { Clock3 } from 'lucide-vue-next'
+import { Clock3, X, Upload, Link } from 'lucide-vue-next'
 
 const musicStore = useMusicStore()
 
 const songs = computed(() => musicStore.songs)
 const loading = computed(() => musicStore.loading)
 const error = computed(() => musicStore.error)
+
+const selectedSong = ref(null)
+const activeAddTab = ref('youtube')
+const activeEditTab = ref('youtube')
 
 const formatDuration = (seconds) => {
     if (!seconds) return '-'
@@ -17,18 +21,31 @@ const formatDuration = (seconds) => {
 }
 
 const handleEdit = (song) => {
-    console.log('Edit song:', song)
-    // TODO: Implement edit modal
+    selectedSong.value = song
+    activeEditTab.value = song.youtube_url ? 'youtube' : 'upload'
+    document.getElementById('edit_modal').showModal()
 }
 
 const handleDelete = (song) => {
-    console.log('Delete song:', song)
-    // TODO: Implement delete confirmation
+    selectedSong.value = song
+    document.getElementById('delete_modal').showModal()
 }
 
 const handleAddNew = () => {
-    console.log('Add new song')
-    // TODO: Implement add new song modal
+    activeAddTab.value = 'youtube'
+    document.getElementById('add_modal').showModal()
+}
+
+const closeModal = (modalId) => {
+    document.getElementById(modalId).close()
+}
+
+const switchAddTab = (tab) => {
+    activeAddTab.value = tab
+}
+
+const switchEditTab = (tab) => {
+    activeEditTab.value = tab
 }
 </script>
 
@@ -149,5 +166,253 @@ const handleAddNew = () => {
                 </div>
             </div>
         </div>
+
+        <dialog id="add_modal" class="modal modal-bottom sm:modal-middle">
+            <div class="modal-box max-w-3xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold">Add New Music</h3>
+                    <button @click="closeModal('add_modal')" class="btn btn-sm btn-circle btn-ghost">
+                        <X :size="20" />
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold mb-2">
+                                Audio Source
+                            </span>
+                        </label>
+
+                        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                            <label
+                                class="label cursor-pointer justify-start gap-3 bg-base-200 rounded-lg p-4 flex-1 hover:bg-base-300 transition-colors"
+                                :class="{ 'ring-2 ring-primary': activeAddTab === 'youtube' }">
+                                <input type="radio" name="add-source" class="radio radio-primary"
+                                    :checked="activeAddTab === 'youtube'" @change="switchAddTab('youtube')" />
+                                <div class="flex items-center gap-2">
+                                    <Link :size="18" />
+                                    <span class="label-text font-medium">YouTube URL</span>
+                                </div>
+                            </label>
+
+                            <label
+                                class="label cursor-pointer justify-start gap-3 bg-base-200 rounded-lg p-4 flex-1 hover:bg-base-300 transition-colors"
+                                :class="{ 'ring-2 ring-primary': activeAddTab === 'upload' }">
+                                <input type="radio" name="add-source" class="radio radio-primary"
+                                    :checked="activeAddTab === 'upload'" @change="switchAddTab('upload')" />
+                                <div class="flex items-center gap-2">
+                                    <Upload :size="18" />
+                                    <span class="label-text font-medium">Upload Audio File</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div v-if="activeAddTab === 'youtube'">
+                            <input type="url" placeholder="https://youtu.be/..." class="input input-bordered w-full" />
+                            <label class="label text-xs">Paste YouTube video URL</label>
+                        </div>
+
+                        <div v-if="activeAddTab === 'upload'">
+                            <input type="file" class="file-input file-input-bordered w-full" accept="audio/*" />
+                            <label class="label text-xs">Supported: MP3, WAV, OGG, M4A</label>
+                        </div>
+                    </div>
+
+                    <div>
+                       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                            <div class="form-control w-full">
+                                <label class="label">
+                                    <span class="label-text font-semibold mb-2">Title</span>
+                                </label>
+                                <input type="text" placeholder="Music title" class="input input-bordered w-full" />
+                            </div>
+
+                            <div class="form-control w-full">
+                                <label class="label">
+                                    <span class="label-text font-semibold mb-2">Artist</span>
+                                </label>
+                                <input type="text" placeholder="Artist name" class="input input-bordered w-full" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold mb-2">
+                                Cover Image
+                            </span>
+                        </label>
+                        <input type="file" class="file-input file-input-bordered w-full" accept="image/*" />
+                        <label class="label text-xs">Recommended: Square image, min 500x500px</label>
+                    </div>
+
+                   <div class="form-control flex flex-col w-full">
+                        <label class="label">
+                            <span class="label-text font-semibold mb-2">
+                                Lyrics (Optional)
+                            </span>
+                        </label>
+
+                        <textarea class="textarea textarea-bordered h-24 w-full" placeholder='{ "time": "8.05", "text": "Sejuta bayangan dirimu" },'></textarea>
+
+                        <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
+                    </div>
+                </div>
+
+                <div class="modal-action mt-6">
+                    <button @click="closeModal('add_modal')" class="btn btn-ghost">Cancel</button>
+                    <button class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Add Music
+                    </button>
+                </div>
+            </div>
+        </dialog>
+
+        <dialog id="edit_modal" class="modal modal-bottom sm:modal-middle">
+            <div class="modal-box max-w-3xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold">Edit Music</h3>
+                    <button @click="closeModal('edit_modal')" class="btn btn-sm btn-circle btn-ghost">
+                        <X :size="20" />
+                    </button>
+                </div>
+
+                <div v-if="selectedSong">
+                    <div class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-semibold mb-2">
+                                    Audio Source
+                                </span>
+                            </label>
+
+                            <div class="alert mb-4" :class="selectedSong.youtube_url ? 'alert-info' : 'alert-success'">
+                                <div class="flex items-center gap-2">
+                                    <Link v-if="selectedSong.youtube_url" :size="20" />
+                                    <Upload v-else :size="20" />
+                                    <div>
+                                        <p class="font-semibold">
+                                            Current Source: {{ selectedSong.youtube_url ? 'YouTube' : 'Uploaded File' }}
+                                        </p>
+                                        <p class="text-sm opacity-80" v-if="selectedSong.youtube_url">
+                                            {{ selectedSong.youtube_url }}
+                                        </p>
+                                        <p class="text-sm opacity-80" v-else>
+                                            Audio file uploaded manually
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="label">
+                                    <span class="label-text mb-2">
+                                        {{ selectedSong.youtube_url ? 'Upload new audio to replace' : 'Replace with new audio' }}
+                                    </span>
+                                </label>
+                                <input type="file" class="file-input file-input-bordered w-full" accept="audio/*" />
+                                <label class="label text-xs mt-2">Leave empty to keep current audio source</label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                                <div class="form-control w-full">
+                                    <label class="label">
+                                        <span class="label-text font-semibold mb-2">Title</span>
+                                    </label>
+                                    <input type="text" placeholder="Music title" class="input input-bordered w-full" />
+                                </div>
+
+                                <div class="form-control w-full">
+                                    <label class="label">
+                                        <span class="label-text font-semibold mb-2">Artist</span>
+                                    </label>
+                                    <input type="text" placeholder="Artist name" class="input input-bordered w-full" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text font-semibold mb-2">
+                                    Cover Image
+                                </span>
+                            </label>
+                            <input type="file" class="file-input file-input-bordered w-full" accept="image/*" />
+                            <label class="label text-xs">Upload new cover or leave empty to keep current</label>
+                        </div>
+
+                        <div class="form-control flex flex-col w-full">
+                            <label class="label">
+                                <span class="label-text font-semibold mb-2">
+                                    Lyrics (Optional)
+                                </span>
+                            </label>
+
+                            <textarea class="textarea textarea-bordered h-24 w-full"
+                                placeholder='{ "time": "8.05", "text": "Sejuta bayangan dirimu" },'></textarea>
+
+                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics
+                                text"}]</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-action mt-6">
+                    <button @click="closeModal('edit_modal')" class="btn btn-ghost">Cancel</button>
+                    <button class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </dialog>
+
+        <dialog id="delete_modal" class="modal modal-bottom sm:modal-middle">
+            <div class="modal-box">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-error">Delete Music</h3>
+                    <button @click="closeModal('delete_modal')" class="btn btn-sm btn-circle btn-ghost">
+                        <X :size="18" />
+                    </button>
+                </div>
+
+                <div v-if="selectedSong" class="py-4">
+                    <p class="mb-4">Are you sure you want to delete this music?</p>
+                    <div class="card bg-base-200">
+                        <div class="card-body p-4">
+                            <div class="flex gap-3 items-center">
+                                <img :src="selectedSong.cover" alt="Cover" class="w-16 h-16 rounded-lg object-cover" />
+                                <div>
+                                    <p class="font-bold">{{ selectedSong.title }}</p>
+                                    <p class="text-sm opacity-60">{{ selectedSong.artist }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-action">
+                    <button @click="closeModal('delete_modal')" class="btn btn-ghost">Cancel</button>
+                    <button class="btn btn-error">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </dialog>
     </div>
 </template>
