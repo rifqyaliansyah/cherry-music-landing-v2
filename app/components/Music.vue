@@ -5,7 +5,6 @@ import { Clock3, X, Upload, Link } from 'lucide-vue-next'
 const config = useRuntimeConfig()
 const apiBaseUrl = config.public.apiBaseUrl
 
-// Local state (tidak pakai store)
 const songs = ref([])
 const loading = ref(false)
 const error = ref(null)
@@ -24,6 +23,7 @@ const addForm = ref({
 })
 
 const editForm = ref({
+    youtube_url: '',
     title: '',
     artist: '',
     cover: null,
@@ -35,13 +35,11 @@ const submitting = ref(false)
 const deleting = ref(false)
 const errorMessage = ref('')
 
-// Keys untuk reset input file
 const addAudioInputKey = ref(0)
 const addCoverInputKey = ref(0)
 const editAudioInputKey = ref(0)
 const editCoverInputKey = ref(0)
 
-// Fetch songs dari API
 const fetchSongs = async () => {
     loading.value = true
     error.value = null
@@ -69,7 +67,6 @@ const fetchSongs = async () => {
     }
 }
 
-// Fetch song detail dari API
 const fetchSongDetail = async (songId) => {
     try {
         const response = await $fetch(`${apiBaseUrl}/songs/${songId}`)
@@ -114,7 +111,6 @@ const formatLyricsForDisplay = (lyrics) => {
     return `[\n${formatted}\n]`
 }
 
-// Reset form functions
 const resetAddForm = () => {
     addForm.value = {
         youtube_url: '',
@@ -125,13 +121,13 @@ const resetAddForm = () => {
         audioFile: null
     }
 
-    // Increment key untuk force re-render input
     addAudioInputKey.value++
     addCoverInputKey.value++
 }
 
 const resetEditForm = () => {
     editForm.value = {
+        youtube_url: '',
         title: '',
         artist: '',
         cover: null,
@@ -139,7 +135,6 @@ const resetEditForm = () => {
         audioFile: null
     }
 
-    // Increment key untuk force re-render input
     editAudioInputKey.value++
     editCoverInputKey.value++
 }
@@ -150,7 +145,6 @@ const handleEdit = async (song) => {
     submitting.value = true
     errorMessage.value = ''
 
-    // Reset form edit terlebih dahulu
     resetEditForm()
 
     try {
@@ -158,6 +152,7 @@ const handleEdit = async (song) => {
 
         if (songDetail) {
             editForm.value = {
+                youtube_url: songDetail.youtube_url || '',
                 title: songDetail.title,
                 artist: songDetail.artist,
                 cover: null,
@@ -168,6 +163,7 @@ const handleEdit = async (song) => {
             }
         } else {
             editForm.value = {
+                youtube_url: song.youtube_url || '',
                 title: song.title,
                 artist: song.artist,
                 cover: null,
@@ -178,6 +174,7 @@ const handleEdit = async (song) => {
     } catch (err) {
         console.error('Error fetching song detail:', err)
         editForm.value = {
+            youtube_url: song.youtube_url || '',
             title: song.title,
             artist: song.artist,
             cover: null,
@@ -208,7 +205,6 @@ const closeModal = (modalId) => {
     document.getElementById(modalId).close()
     errorMessage.value = ''
 
-    // Reset form saat modal ditutup
     if (modalId === 'add_modal') {
         resetAddForm()
     } else if (modalId === 'edit_modal') {
@@ -276,7 +272,7 @@ const submitAddSong = async () => {
             })
 
             if (response.success) {
-                resetAddForm() // Reset form setelah berhasil
+                resetAddForm()
                 await fetchSongs()
                 closeModal('add_modal')
             }
@@ -311,7 +307,7 @@ const submitAddSong = async () => {
             })
 
             if (response.success) {
-                resetAddForm() // Reset form setelah berhasil
+                resetAddForm()
                 await fetchSongs()
                 closeModal('add_modal')
             }
@@ -333,16 +329,22 @@ const submitEditSong = async () => {
     try {
         const formData = new FormData()
 
+        if (activeEditTab.value === 'youtube') {
+            if (editForm.value.youtube_url && editForm.value.youtube_url !== selectedSong.value.youtube_url) {
+                formData.append('youtube_url', editForm.value.youtube_url)
+            }
+        } else {
+            if (editForm.value.audioFile instanceof File) {
+                formData.append('audio', editForm.value.audioFile)
+            }
+        }
+
         if (editForm.value.title) {
             formData.append('title', editForm.value.title)
         }
 
         if (editForm.value.artist) {
             formData.append('artist', editForm.value.artist)
-        }
-
-        if (editForm.value.audioFile instanceof File) {
-            formData.append('audio', editForm.value.audioFile)
         }
 
         if (editForm.value.cover instanceof File) {
@@ -369,7 +371,7 @@ const submitEditSong = async () => {
         })
 
         if (response.success) {
-            resetEditForm() // Reset form setelah berhasil
+            resetEditForm()
             await fetchSongs()
             closeModal('edit_modal')
         }
@@ -523,7 +525,6 @@ const submitDeleteSong = async () => {
             </div>
         </div>
 
-        <!-- Add Modal -->
         <dialog id="add_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box max-w-3xl">
                 <div class="flex items-center justify-between mb-6">
@@ -545,9 +546,7 @@ const submitDeleteSong = async () => {
                 <div class="space-y-4">
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text font-semibold mb-2">
-                                Audio Source
-                            </span>
+                            <span class="label-text font-semibold mb-2">Audio Source</span>
                         </label>
 
                         <div class="flex flex-col sm:flex-row gap-4 mb-4">
@@ -610,9 +609,7 @@ const submitDeleteSong = async () => {
 
                     <div class="form-control">
                         <label class="label">
-                            <span class="label-text font-semibold mb-2">
-                                Cover Image
-                            </span>
+                            <span class="label-text font-semibold mb-2">Cover Image</span>
                         </label>
                         <input @change="handleAddCoverFile" type="file" class="file-input file-input-bordered w-full"
                             accept="image/*" :key="addCoverInputKey" />
@@ -621,9 +618,7 @@ const submitDeleteSong = async () => {
 
                     <div class="form-control flex flex-col w-full">
                         <label class="label">
-                            <span class="label-text font-semibold mb-2">
-                                Lyrics (Optional)
-                            </span>
+                            <span class="label-text font-semibold mb-2">Lyrics (Optional)</span>
                         </label>
 
                         <textarea v-model="addForm.lyrics" class="textarea textarea-bordered h-24 w-full"
@@ -648,7 +643,6 @@ const submitDeleteSong = async () => {
             </div>
         </dialog>
 
-        <!-- Edit Modal -->
         <dialog id="edit_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box max-w-3xl">
                 <div class="flex items-center justify-between mb-6">
@@ -671,9 +665,7 @@ const submitDeleteSong = async () => {
                     <div class="space-y-4">
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text font-semibold mb-2">
-                                    Audio Source
-                                </span>
+                                <span class="label-text font-semibold mb-2">Audio Source</span>
                             </label>
 
                             <div class="alert mb-4" :class="selectedSong.youtube_url ? 'alert-info' : 'alert-success'">
@@ -682,7 +674,7 @@ const submitDeleteSong = async () => {
                                     <Upload v-else :size="20" />
                                     <div>
                                         <p class="font-semibold">
-                                            Current Source: {{ selectedSong.youtube_url ? 'YouTube' : 'Uploaded File' }}
+                                            Current: {{ selectedSong.youtube_url ? 'YouTube' : 'Uploaded File' }}
                                         </p>
                                         <p class="text-sm opacity-80" v-if="selectedSong.youtube_url">
                                             {{ selectedSong.youtube_url }}
@@ -694,16 +686,45 @@ const submitDeleteSong = async () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label class="label">
-                                    <span class="label-text mb-2">
-                                        {{ selectedSong.youtube_url ? 'Upload new audio to replace' : 'Replace with new audio' }}
-                                    </span>
+                            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                                <label
+                                    class="label cursor-pointer justify-start gap-3 bg-base-200 rounded-lg p-4 flex-1 hover:bg-base-300 transition-colors"
+                                    :class="{ 'ring-2 ring-primary': activeEditTab === 'youtube' }">
+                                    <input type="radio" name="edit-source" class="radio radio-primary"
+                                        :checked="activeEditTab === 'youtube'" @change="switchEditTab('youtube')" />
+                                    <div class="flex items-center gap-2">
+                                        <Link :size="18" />
+                                        <span class="label-text font-medium">YouTube URL</span>
+                                    </div>
                                 </label>
+
+                                <label
+                                    class="label cursor-pointer justify-start gap-3 bg-base-200 rounded-lg p-4 flex-1 hover:bg-base-300 transition-colors"
+                                    :class="{ 'ring-2 ring-primary': activeEditTab === 'upload' }">
+                                    <input type="radio" name="edit-source" class="radio radio-primary"
+                                        :checked="activeEditTab === 'upload'" @change="switchEditTab('upload')" />
+                                    <div class="flex items-center gap-2">
+                                        <Upload :size="18" />
+                                        <span class="label-text font-medium">Upload Audio File</span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div v-if="activeEditTab === 'youtube'">
+                                <input v-model="editForm.youtube_url" type="url" placeholder="https://youtu.be/..."
+                                    class="input input-bordered w-full" />
+                                <label class="label text-xs">
+                                    {{ selectedSong.youtube_url ? 'Update YouTube URL or leave unchanged' : 'Add YouTube URL to replace uploaded file' }}
+                                </label>
+                            </div>
+
+                            <div v-if="activeEditTab === 'upload'">
                                 <input @change="handleEditAudioFile" type="file"
                                     class="file-input file-input-bordered w-full" accept="audio/*"
                                     :key="editAudioInputKey" />
-                                <label class="label text-xs mt-2">Leave empty to keep current audio source</label>
+                                <label class="label text-xs">
+                                    {{ selectedSong.youtube_url ? 'Upload audio file to replace YouTube source' : 'Upload new audio file or leave unchanged' }}
+                                </label>
                             </div>
                         </div>
 
@@ -729,9 +750,7 @@ const submitDeleteSong = async () => {
 
                         <div class="form-control">
                             <label class="label">
-                                <span class="label-text font-semibold mb-2">
-                                    Cover Image
-                                </span>
+                                <span class="label-text font-semibold mb-2">Cover Image</span>
                             </label>
                             <input @change="handleEditCoverFile" type="file"
                                 class="file-input file-input-bordered w-full" accept="image/*"
@@ -741,15 +760,12 @@ const submitDeleteSong = async () => {
 
                         <div class="form-control flex flex-col w-full">
                             <label class="label">
-                                <span class="label-text font-semibold mb-2">
-                                    Lyrics (Optional)
-                                </span>
+                                <span class="label-text font-semibold mb-2">Lyrics (Optional)</span>
                             </label>
                             <textarea v-model="editForm.lyrics" class="textarea textarea-bordered h-24 w-full"
                                 placeholder='[{"time": "8.05", "text": "Sejuta bayangan dirimu"}]'></textarea>
 
-                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics
-                                text"}]</label>
+                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
                         </div>
                     </div>
                 </div>
@@ -769,7 +785,6 @@ const submitDeleteSong = async () => {
             </div>
         </dialog>
 
-        <!-- Delete Modal -->
         <dialog id="delete_modal" class="modal modal-bottom sm:modal-middle">
             <div class="modal-box">
                 <div class="flex items-center justify-between mb-4">
