@@ -76,6 +76,10 @@ export const getAllSongs = async () => {
                 youtube_url: song.youtube_url,
                 createdAt: song.createdAt
             }))
+            songs.sort((a, b) => {
+                return (b.createdAt || 0) - (a.createdAt || 0)
+            })
+
             resolve(songs)
         }
 
