@@ -12,7 +12,7 @@ const closeDrawer = () => {
 </script>
 
 <template>
-    <div class="drawer-side is-drawer-close:overflow-visible">
+    <div class="drawer-side is-drawer-close:overflow-visible lg:z-auto z-50">
         <label for="my-drawer-4" aria-label="close sidebar" class="drawer-overlay"></label>
 
         <div class="flex min-h-full flex-col items-start bg-base-200
@@ -36,24 +36,6 @@ const closeDrawer = () => {
                         <span class="is-drawer-close:hidden">Manage Music</span>
                     </NuxtLink>
                 </li>
-
-                <!-- <li>
-                    <NuxtLink to="/like" @click="closeDrawer"
-                        class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
-                        data-tip="Liked Music">
-                        <Heart class="my-1.5 inline-block size-4" />
-                        <span class="is-drawer-close:hidden">Liked</span>
-                    </NuxtLink>
-                </li>
-
-                <li>
-                    <NuxtLink to="/search" @click="closeDrawer"
-                        class="is-drawer-close:tooltip is-drawer-close:tooltip-right flex items-center gap-3"
-                        data-tip="Search">
-                        <Search class="my-1.5 inline-block size-4" />
-                        <span class="is-drawer-close:hidden">Search</span>
-                    </NuxtLink>
-                </li> -->
             </ul>
         </div>
     </div>
