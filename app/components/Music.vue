@@ -1,9 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { Clock3, X, Upload, Link } from 'lucide-vue-next'
+import { useMusicStore } from '~/stores/music'
 
-const config = useRuntimeConfig()
-const apiBaseUrl = config.public.apiBaseUrl
+const musicStore = useMusicStore()
 
 const songs = ref([])
 const loading = ref(false)
@@ -45,19 +45,7 @@ const fetchSongs = async () => {
     error.value = null
 
     try {
-        const response = await $fetch(`${apiBaseUrl}/songs`)
-
-        if (response.success && response.data) {
-            songs.value = response.data.map(song => ({
-                id: song.id,
-                title: song.title,
-                artist: song.artist,
-                cover: song.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
-                duration: song.duration,
-                audio_url: song.audio_url,
-                youtube_url: song.youtube_url
-            }))
-        }
+        songs.value = await musicStore.fetchSongs()
     } catch (err) {
         error.value = err.message || 'Failed to fetch songs'
         console.error('Error fetching songs:', err)
@@ -69,21 +57,7 @@ const fetchSongs = async () => {
 
 const fetchSongDetail = async (songId) => {
     try {
-        const response = await $fetch(`${apiBaseUrl}/songs/${songId}`)
-
-        if (response.success && response.data) {
-            return {
-                id: response.data.id,
-                title: response.data.title,
-                artist: response.data.artist,
-                cover: response.data.cover_url || 'https://placehold.co/300x300/333/fff?text=No+Cover',
-                duration: response.data.duration,
-                audio_url: response.data.audio_url,
-                youtube_url: response.data.youtube_url,
-                lyrics: response.data.lyrics || []
-            }
-        }
-        return null
+        return await musicStore.fetchSongDetail(songId)
     } catch (err) {
         console.error('Error fetching song detail:', err)
         return null
@@ -247,74 +221,65 @@ const submitAddSong = async () => {
                 return
             }
 
-            const formData = new FormData()
-            formData.append('youtube_url', addForm.value.youtube_url)
-            formData.append('title', addForm.value.title)
-            formData.append('artist', addForm.value.artist)
-
-            if (addForm.value.cover instanceof File) {
-                formData.append('cover', addForm.value.cover)
-            }
-
+            let parsedLyrics = []
             if (addForm.value.lyrics) {
                 try {
-                    const parsedLyrics = JSON.parse(addForm.value.lyrics)
-                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                    parsedLyrics = JSON.parse(addForm.value.lyrics)
                 } catch (e) {
                     errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
                     return
                 }
             }
 
-            const response = await $fetch(`${apiBaseUrl}/songs/download`, {
-                method: 'POST',
-                body: formData
-            })
-
-            if (response.success) {
-                resetAddForm()
-                await fetchSongs()
-                closeModal('add_modal')
+            const metadata = {
+                title: addForm.value.title,
+                artist: addForm.value.artist,
+                cover: addForm.value.cover,
+                lyrics: parsedLyrics
             }
+
+            await musicStore.downloadFromYouTube(addForm.value.youtube_url, metadata)
+
+            resetAddForm()
+            await fetchSongs()
+            closeModal('add_modal')
         } else {
             if (!addForm.value.audioFile || !addForm.value.title || !addForm.value.artist) {
                 errorMessage.value = 'Audio file, title, and artist are required'
                 return
             }
 
-            const formData = new FormData()
-            formData.append('audio', addForm.value.audioFile)
-            formData.append('title', addForm.value.title)
-            formData.append('artist', addForm.value.artist)
-
-            if (addForm.value.cover instanceof File) {
-                formData.append('cover', addForm.value.cover)
-            }
-
+            let parsedLyrics = []
             if (addForm.value.lyrics) {
                 try {
-                    const parsedLyrics = JSON.parse(addForm.value.lyrics)
-                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                    parsedLyrics = JSON.parse(addForm.value.lyrics)
                 } catch (e) {
                     errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
                     return
                 }
             }
 
-            const response = await $fetch(`${apiBaseUrl}/songs/upload`, {
-                method: 'POST',
-                body: formData
-            })
+            const duration = await musicStore.getAudioDuration(addForm.value.audioFile)
 
-            if (response.success) {
-                resetAddForm()
-                await fetchSongs()
-                closeModal('add_modal')
+            const songData = {
+                title: addForm.value.title,
+                artist: addForm.value.artist,
+                audioBlob: addForm.value.audioFile,
+                coverBlob: addForm.value.cover,
+                duration: duration,
+                lyrics: parsedLyrics,
+                youtube_url: null
             }
+
+            await musicStore.addNewSong(songData)
+
+            resetAddForm()
+            await fetchSongs()
+            closeModal('add_modal')
         }
     } catch (err) {
         console.error('Add song error:', err)
-        errorMessage.value = err.data?.message || err.message || 'Failed to add song'
+        errorMessage.value = err.message || 'Failed to add song'
     } finally {
         submitting.value = false
     }
@@ -327,37 +292,38 @@ const submitEditSong = async () => {
     submitting.value = true
 
     try {
-        const formData = new FormData()
+        const updates = {}
 
         if (activeEditTab.value === 'youtube') {
             if (editForm.value.youtube_url && editForm.value.youtube_url !== selectedSong.value.youtube_url) {
-                formData.append('youtube_url', editForm.value.youtube_url)
+                errorMessage.value = 'Changing YouTube URL is not supported in edit mode. Please delete and re-add the song.'
+                return
             }
         } else {
             if (editForm.value.audioFile instanceof File) {
-                formData.append('audio', editForm.value.audioFile)
+                updates.audioBlob = editForm.value.audioFile
+                updates.duration = await musicStore.getAudioDuration(editForm.value.audioFile)
             }
         }
 
         if (editForm.value.title) {
-            formData.append('title', editForm.value.title)
+            updates.title = editForm.value.title
         }
 
         if (editForm.value.artist) {
-            formData.append('artist', editForm.value.artist)
+            updates.artist = editForm.value.artist
         }
 
         if (editForm.value.cover instanceof File) {
-            formData.append('cover', editForm.value.cover)
+            updates.coverBlob = editForm.value.cover
         }
 
         if (editForm.value.lyrics !== null && editForm.value.lyrics !== undefined) {
             if (editForm.value.lyrics.trim() === '') {
-                formData.append('lyrics', JSON.stringify([]))
+                updates.lyrics = []
             } else {
                 try {
-                    const parsedLyrics = JSON.parse(editForm.value.lyrics)
-                    formData.append('lyrics', JSON.stringify(parsedLyrics))
+                    updates.lyrics = JSON.parse(editForm.value.lyrics)
                 } catch (e) {
                     errorMessage.value = 'Invalid lyrics format. Must be valid JSON array.'
                     return
@@ -365,19 +331,14 @@ const submitEditSong = async () => {
             }
         }
 
-        const response = await $fetch(`${apiBaseUrl}/songs/${selectedSong.value.id}`, {
-            method: 'PUT',
-            body: formData
-        })
+        await musicStore.updateExistingSong(selectedSong.value.id, updates)
 
-        if (response.success) {
-            resetEditForm()
-            await fetchSongs()
-            closeModal('edit_modal')
-        }
+        resetEditForm()
+        await fetchSongs()
+        closeModal('edit_modal')
     } catch (err) {
         console.error('Edit song error:', err)
-        errorMessage.value = err.data?.message || err.message || 'Failed to update song'
+        errorMessage.value = err.message || 'Failed to update song'
     } finally {
         submitting.value = false
     }
@@ -390,17 +351,12 @@ const submitDeleteSong = async () => {
     deleting.value = true
 
     try {
-        const response = await $fetch(`${apiBaseUrl}/songs/${selectedSong.value.id}`, {
-            method: 'DELETE'
-        })
-
-        if (response.success) {
-            await fetchSongs()
-            closeModal('delete_modal')
-        }
+        await musicStore.deleteExistingSong(selectedSong.value.id)
+        await fetchSongs()
+        closeModal('delete_modal')
     } catch (err) {
         console.error('Delete song error:', err)
-        errorMessage.value = err.data?.message || err.message || 'Failed to delete song'
+        errorMessage.value = err.message || 'Failed to delete song'
     } finally {
         deleting.value = false
     }
@@ -649,11 +605,9 @@ const submitDeleteSong = async () => {
                             <span class="label-text font-semibold mb-2">Lyrics (Optional)</span>
                         </label>
 
-                        <textarea v-model="addForm.lyrics" class="textarea textarea-bordered h-24 w-full"
-                            placeholder='[
+                        <textarea v-model="addForm.lyrics" class="textarea textarea-bordered h-24 w-full" placeholder='[
     { "time": "1.80", "text": "Dalam benakku lama tertanam" },
-    { "time": "8.05", "text": "Sejuta bayangan dirimu" },
-    { "time": "14.54", "text": "Redup terasa cahaya hati" }
+    { "time": "8.05", "text": "Sejuta bayangan dirimu" }
 ]'></textarea>
 
                         <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
@@ -747,9 +701,9 @@ const submitDeleteSong = async () => {
 
                             <div v-if="activeEditTab === 'youtube'">
                                 <input v-model="editForm.youtube_url" type="url" placeholder="https://youtu.be/..."
-                                    class="input input-bordered w-full" />
-                                <label class="label text-xs">
-                                    {{ selectedSong.youtube_url ? 'Update YouTube URL or leave unchanged' : 'Add YouTube URL to replace uploaded file' }}
+                                    class="input input-bordered w-full" disabled />
+                                <label class="label text-xs text-warning">
+                                    Changing YouTube URL not supported. Delete and re-add to change source.
                                 </label>
                             </div>
 
@@ -758,7 +712,7 @@ const submitDeleteSong = async () => {
                                     class="file-input file-input-bordered w-full" accept="audio/*"
                                     :key="editAudioInputKey" />
                                 <label class="label text-xs">
-                                    {{ selectedSong.youtube_url ? 'Upload audio file to replace YouTube source' : 'Upload new audio file or leave unchanged' }}
+                                    Upload new audio file or leave unchanged
                                 </label>
                             </div>
                         </div>
@@ -800,11 +754,11 @@ const submitDeleteSong = async () => {
                             <textarea v-model="editForm.lyrics" class="textarea textarea-bordered h-24 w-full"
                                 placeholder='[
     { "time": "1.80", "text": "Dalam benakku lama tertanam" },
-    { "time": "8.05", "text": "Sejuta bayangan dirimu" },
-    { "time": "14.54", "text": "Redup terasa cahaya hati" }
+    { "time": "8.05", "text": "Sejuta bayangan dirimu" }
 ]'></textarea>
 
-                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics text"}]</label>
+                            <label class="label text-xs mt-2">Format: [{"time": "seconds", "text": "lyrics
+                                text"}]</label>
                         </div>
                     </div>
                 </div>
@@ -822,7 +776,7 @@ const submitDeleteSong = async () => {
                     </button>
                 </div>
                 <p class="text-xs text-base-content/60 text-right mt-2">
-                    Note: Updating audio source may take a few moments.
+                    Note: Updating may take a few moments.
                 </p>
             </div>
         </dialog>
