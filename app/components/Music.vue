@@ -426,19 +426,47 @@ const submitDeleteSong = async () => {
                     </button>
                 </div>
 
-                <div v-if="loading" class="space-y-4">
-                    <div v-for="i in 5" :key="i" class="card bg-base-100 shadow-md">
-                        <div class="card-body">
-                            <div class="flex gap-4">
-                                <div class="skeleton w-20 h-20 rounded-xl"></div>
-                                <div class="flex-1 space-y-2">
-                                    <div class="skeleton h-5 w-3/4"></div>
-                                    <div class="skeleton h-4 w-1/2"></div>
-                                    <div class="skeleton h-4 w-1/4"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div v-if="loading" class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th class="w-12">#</th>
+                                <th class="hidden md:table-cell w-20"></th>
+                                <th>Title</th>
+                                <th class="hidden sm:table-cell">Artist</th>
+                                <th class="hidden lg:table-cell w-32 text-center">
+                                    <Clock3 :size="16" class="inline-block" />
+                                </th>
+                                <th class="text-center w-32">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="i in 5" :key="i">
+                                <td>
+                                    <div class="skeleton h-4 w-6"></div>
+                                </td>
+                                <td class="hidden md:table-cell">
+                                    <div class="skeleton w-12 h-12 rounded-lg"></div>
+                                </td>
+                                <td>
+                                    <div class="skeleton h-4 w-32 mb-1"></div>
+                                    <div class="skeleton h-3 w-20 sm:hidden"></div>
+                                </td>
+                                <td class="hidden sm:table-cell">
+                                    <div class="skeleton h-4 w-24"></div>
+                                </td>
+                                <td class="hidden lg:table-cell text-center">
+                                    <div class="skeleton h-4 w-12 mx-auto"></div>
+                                </td>
+                                <td>
+                                    <div class="flex gap-2 justify-center">
+                                        <div class="skeleton w-8 h-8 rounded-btn"></div>
+                                        <div class="skeleton w-8 h-8 rounded-btn"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div v-else-if="error" class="alert alert-error">
