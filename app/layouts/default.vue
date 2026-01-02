@@ -103,8 +103,7 @@ const nextSong = async () => {
         }
     }
 
-    const songDetail = await musicStore.fetchSongDetail(songs.value[nextIndex].id)
-    let songToPlay = songDetail || songs.value[nextIndex]
+    let songToPlay = songs.value[nextIndex]
 
     currentSong.value = songToPlay
     currentIndex.value = nextIndex
@@ -130,8 +129,7 @@ const previousSong = async () => {
         }
     }
 
-    const songDetail = await musicStore.fetchSongDetail(songs.value[prevIndex].id)
-    let songToPlay = songDetail || songs.value[prevIndex]
+    let songToPlay = songs.value[prevIndex]
 
     currentSong.value = songToPlay
     currentIndex.value = prevIndex
@@ -318,8 +316,7 @@ const restorePlayerState = async () => {
         return
     }
 
-    const songDetail = await musicStore.fetchSongDetail(freshSong.id)
-    const songToRestore = songDetail || freshSong
+    const songToRestore = freshSong
 
     currentSong.value = songToRestore
     currentIndex.value = songs.value.findIndex(s => s.id === freshSong.id)
@@ -374,13 +371,10 @@ provide('playerState', {
             return
         }
 
-        const songDetail = await musicStore.fetchSongDetail(song.id)
-        let songToPlay = songDetail || song
-
-        currentSong.value = songToPlay
+        currentSong.value = song
         currentIndex.value = index
 
-        await loadAndPlayAudio(songToPlay)
+        await loadAndPlayAudio(song)
         isPlaying.value = true
     },
     togglePlay,
